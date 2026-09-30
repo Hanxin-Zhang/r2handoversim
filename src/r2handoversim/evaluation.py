@@ -1,0 +1,95 @@
+"""Evaluate replay traces against the five criteria with explicit proxy scope."""
+from collections import Counter
+import numpy as np
+from .geometry import (box_pose, gripper_boxes, intersects, inverse, moved, points,
+                       pose, projected_width, sphere_intersects, transform, unit, vector)
+from .robot import arm_boxes, joints, tcp
+
+ORDER = ("stability", "plan", "reach", "affordance", "safe")
+
+
+def validate_trial(trial):
+    if trial.get("schema_version") != "handover.trial.v1" or trial.get("units") != "m":
+        raise ValueError("Expected handover.trial.v1 with units=m")
+    if trial["split"] not in ("S0", "S1"):
+        raise ValueError("Split must be S0 or S1")
+    transform(trial["T_object_gripper"])
+    transform(trial["target_T_world_gripper"])
+    if not trial["planned_joints"] or not trial["executed_joints"]:
+        raise ValueError("Both planned and executed trajectories must be nonempty")
+    for q in trial["planned_joints"] + trial["executed_joints"]:
+        joints(q)
+    for b in trial["object_boxes"] + trial["usage_boxes"] + trial["hand_boxes_world"]:
+        box_pose(b)
+    if not trial["object_boxes"] or not trial["hand_boxes_world"]:
+        raise ValueError("Object and receiving hand geometries cannot be empty")
+    if trial["split"] == "S1" and not trial["usage_boxes"]:
+        raise ValueError("S1 requires intended usage geometry")
+    for k in ("max_opening_m", "dt_s", "reach_radius_m"):
+        if not np.isfinite(trial[k]) or trial[k] <= 0:
+            raise ValueError(f"{k} must be positive")
+    vector(trial["palm_position_world"])
+    unit(trial["palm_normal_world"])
+    if not np.isfinite(trial["reach_offset_m"]):
+        raise ValueError("Reach offset must be finite")
+
+
+def robot_geometry(trial, q, width=None):
+    if width is None:
+        width = projected_width(trial["object_boxes"], transform(trial["T_object_gripper"])[:3, 1])
+    return arm_boxes(q) + [moved(b, tcp(q)) for b in gripper_boxes(min(width, trial["max_opening_m"]))]
+
+
+def hand_contact(trial, q, width):
+    return any(intersects(a, b) for a in robot_geometry(trial, q, width) for b in trial["hand_boxes_world"])
+
+
+def evaluate(trial, physics_contacts=None):
+    validate_trial(trial)
+    grasp = transform(trial["T_object_gripper"])
+    width = projected_width(trial["object_boxes"], grasp[:3, 1])
+    stable = width <= trial["max_opening_m"] + 1e-9
+    planned, executed = trial["planned_joints"], trial["executed_joints"]
+    target = transform(trial["target_T_world_gripper"])
+    end = tcp(planned[-1])
+    endpoint_ok = np.linalg.norm(end[:3, 3] - target[:3, 3]) <= .005 and np.allclose(end[:3, :3], target[:3, :3], atol=.01)
+    limits_ok = all(np.all(np.abs(joints(q)) <= 2*np.pi) for q in planned)
+    # A sampled path check, no planner search, self-collision or obstacle checking.
+    plan_contact = any(hand_contact(trial, q, width) for q in planned)
+    plan = bool(endpoint_ok and limits_ok and not plan_contact)
+    final_world_object = tcp(executed[-1]) @ inverse(grasp)
+    delivered = [moved(b, final_world_object) for b in trial["object_boxes"]]
+    sphere_center = vector(trial["palm_position_world"]) + trial["reach_offset_m"]*unit(trial["palm_normal_world"])
+    reach = any(sphere_intersects(b, sphere_center, trial["reach_radius_m"]) for b in delivered)
+    fingers = [moved(b, grasp) for b in gripper_boxes(min(width, trial["max_opening_m"])) if b["label"] == "finger"]
+    affordance = (not any(intersects(a, b) for a in fingers for b in trial["usage_boxes"])) if trial["split"] == "S1" else None
+    if physics_contacts is None:
+        contact_indices = [i for i, q in enumerate(executed) if hand_contact(trial, q, width)]
+        safe_source = "sampled oriented-box intersections"
+    else:
+        if len(physics_contacts) != len(executed):
+            raise ValueError("Physics contact trace must cover every executed frame")
+        contact_indices = [i for i, hit in enumerate(physics_contacts) if hit]
+        safe_source = "Isaac Sim PhysX overlap queries at every replay frame"
+    values = {"stability": bool(stable), "plan": plan, "reach": bool(reach),
+              "affordance": affordance, "safe": not contact_indices}
+    failure = next((k for k in ORDER if values[k] is False), None)
+    return {"trial_id": trial["id"], "object_id": trial["object_id"], "split": trial["split"],
+            "variant": trial["variant"], "metrics": values, "success": failure is None,
+            "first_failure": failure, "width_m": width, "contact_frames": contact_indices,
+            "safe_source": safe_source, "trajectory_duration_s": (len(executed)-1)*trial["dt_s"],
+            "planning_time_s": None, "execution_wall_time_s": None,
+            "scope": "Procedural geometry and UR5e joint replay; not original paper trials",
+            "plan_scope": "Provided joint path: joint limits, endpoint and sampled hand clearance only"}
+
+
+def summarize(results):
+    groups = {}
+    for split in ("S0", "S1"):
+        rows = [r for r in results if r["split"] == split]
+        if not rows:
+            continue
+        counts = Counter(r["first_failure"] for r in rows if not r["success"])
+        groups[split] = {"trials": len(rows), "success_rate": sum(r["success"] for r in rows)/len(rows),
+                         "failure_rates": {k: (None if k == "affordance" and split == "S0" else counts[k]/len(rows)) for k in ORDER}}
+    return {"schema_version": "handover.summary.v1", "scope": "demo results, not paper numbers", "splits": groups}

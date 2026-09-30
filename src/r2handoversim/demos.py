@@ -1,0 +1,54 @@
+"""Standalone demo fixtures and conversion from Intent-Handover scene/selection."""
+from copy import deepcopy
+from importlib.resources import files
+import json
+import numpy as np
+from .geometry import box, inverse, moved, points, pose, transform
+from .robot import GOAL, HOME, interpolate, solve_position, tcp
+
+NAMES = ("hammer", "screwdriver", "bottle")
+VARIANTS = ("intent_aware", "region_agnostic", "execution_deviation", "missed_delivery")
+
+
+def load_demo(name, variant="intent_aware"):
+    if name not in NAMES or variant not in VARIANTS:
+        raise ValueError("Unknown demo object or variant")
+    return json.loads(files(__package__).joinpath("assets", f"{name}_{variant}.json").read_text())
+
+
+def from_selection(scene, selection, steps=90, variant="intent_aware"):
+    if scene.get("schema_version") != "handover.scene.v1" or selection.get("schema_version") != "handover.selection.v1":
+        raise ValueError("Expected Intent-Handover v1 scene and selection")
+    if selection.get("status") != "ok" or not selection.get("selected"):
+        raise ValueError("Cannot replay a selection without a feasible grasp")
+    if selection["object_id"] != scene["object"]["id"]:
+        raise ValueError("Scene and selection object ids differ")
+    grasp = transform(selection["selected"]["T_object_gripper"])
+    goal = tcp(GOAL)
+    world_object = goal @ inverse(grasp)
+    region = scene["intent"]["human_region"]
+    # A fixed, open hand proxy near the intended region. This is not MANO output.
+    palm_object = np.array(scene["receiving_hand"]["center"], dtype=float)
+    palm_world = points(world_object, palm_object)
+    normal_world = world_object[:3, :3] @ np.array([1., 0., 0.])
+    hand_boxes = [moved(b, world_object) for b in scene["receiving_hand"]["boxes"]]
+    planned = interpolate(HOME, GOAL, steps)
+    executed = deepcopy(planned)
+    if variant == "execution_deviation":
+        # Unplanned deviation deliberately takes the TCP through the palm.
+        bad = solve_position(hand_boxes[0]["center"])
+        executed = interpolate(HOME, bad, steps//2) + interpolate(bad, GOAL, steps//2)[1:]
+    elif variant == "missed_delivery":
+        # Deliberately stop at home instead of reaching the planned goal.
+        executed = [HOME.tolist()] * steps
+    return {"schema_version": "handover.trial.v1", "units": "m",
+            "id": f"{scene['object']['id']}_{variant}", "object_id": scene["object"]["id"],
+            "variant": variant, "split": "S0" if scene["object"]["id"] == "bottle" else "S1",
+            "provenance": "Procedural release demo; not a baseline reproduction or paper trial",
+            "T_object_gripper": grasp.tolist(), "target_T_world_gripper": goal.tolist(),
+            "object_boxes": deepcopy(scene["object"]["boxes"]),
+            "usage_boxes": deepcopy(scene["object"]["usage_regions"][region]),
+            "hand_boxes_world": hand_boxes, "palm_position_world": palm_world.tolist(),
+            "palm_normal_world": normal_world.tolist(), "reach_offset_m": .12,
+            "reach_radius_m": .10, "max_opening_m": .085, "dt_s": 1/60,
+            "planned_joints": planned, "executed_joints": executed}
