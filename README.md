@@ -114,6 +114,38 @@ with `--hand-collision mesh`.
 
 ![Original UR5e, Robotiq and object mesh](docs/isaac_asset_replay.png)
 
+## Resolved scenes and trajectory records
+
+Every Isaac Sim run exports `*_trial.json` with the scene actually replayed,
+including the fitted grasp, calibrated tool offset and retargeted receiver.
+Load this file directly to repeat the same scene:
+
+```bash
+r2handoversim demo --trial outputs/asset_replay/example_trial.json --headless \
+  --video --animation --output outputs/reloaded
+```
+
+The resolved file embeds the object mesh and references the local robot USD.
+It does not need `--asset-config` again. The adapter rechecks the original pad
+contacts without refitting or moving the hand a second time. Changed mesh,
+robot placement, grasp or tool calibration is rejected; regenerate from the
+original input when changing assets.
+
+`*_trajectory.npz` contains aligned `time_s`, `joint_position_rad`,
+`T_world_tool`, `T_world_object`, `T_object_gripper`, and
+`robot_hand_contact` arrays. Read with `numpy.load(path, allow_pickle=False)`.
+For original-asset runs, tool poses are read from the USD at every frame and
+checked against the replay model. These are replay observations, separate from
+paper reference statistics. JSON/CSV/HTML show reference and evaluated outcomes
+separately, and retain right/left pad distances.
+
+Receiver retargeting also updates the skeleton, hand center, facing direction
+and delivery annotations. Its transform and the pre-calibration delivery/plan
+are retained. This asset adapter changes the receiver per trial; a converted
+paired experiment is explicitly marked `paired_receiver_preserved: false`.
+Use these outputs for replay review, not as an unchanged fixed-receiver
+comparison across methods.
+
 ## Paper replay
 
 ```bash

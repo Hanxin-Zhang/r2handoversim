@@ -146,3 +146,10 @@ The report retains the original grasp and exposes both measured distances.
 The handover camera now includes the grasp location, including for long objects.
 38 CPU tests pass, including detached approaches and objects exceeding aperture.
 This remains geometric contact replay, not a frictional holding-force test.
+
+## Resolved trajectory exports (0.8.0)
+
+- 44 CPU tests pass, including scene preparation idempotence, changed-asset rejection, receiver/skeleton frame consistency and separation of reference labels from measured results.
+- A real-asset binocular/MANO replay was exported and reloaded in Isaac Sim. All 90 timestamps, joint states, tool/object poses and PhysX contact observations agreed to an absolute tolerance of 1e-10.
+- The six authored outcome examples were replayed again. All exported NPZ contact frames and durations agree with the JSON results, and all six reference outcomes match the evaluated outcomes.
+- Resolved JSON embeds the scene actually used, including calibration and receiver retargeting. The NPZ stores numeric frame observations without pickle objects. This validation concerns kinematic replay, not a new paper experiment or frictional grasp test.

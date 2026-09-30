@@ -12,7 +12,7 @@ def write_report(results, output):
         name = str(r["trial_id"])
         links = []
         if re.fullmatch(r"[a-zA-Z0-9_-]+", name):
-            for suffix, label in [(".mp4", "Video"), (".png", "Screenshot"), (".usda", "Scene"), ("_animation.usda", "Animation")]:
+            for suffix, label in [(".mp4", "Video"), (".png", "Screenshot"), (".usda", "Scene"), ("_animation.usda", "Animation"), ("_trial.json", "Resolved trial"), ("_trajectory.npz", "Trajectory")]:
                 filename = name + suffix
                 if filename in r.get("artifacts", {}).values() and (output/filename).exists():
                     links.append(f'<a href="{filename}">{label}</a>')
@@ -24,8 +24,10 @@ def write_report(results, output):
         contact = r.get('grasp_contact', {})
         distances = contact.get('bilateral_distance_m')
         contact_text = (' / '.join(f'{d*1000:.3f}' for d in distances) + ' mm') if distances else contact.get('status', '—')
+        reference = r.get('replay_reference') or {}
+        reference_text = str(reference.get('assigned_outcome', '—'))
         rows.append(f'<tr><td>{html.escape(name)}</td><td>{html.escape(r["split"])}</td>'
-                    + ''.join(flags) + f'<td>{html.escape(r["first_failure"] or "success")}</td><td>{html.escape(contact_text)}</td><td>{" · ".join(links)}</td></tr>')
+                    + ''.join(flags) + f'<td>{html.escape(reference_text)}</td><td>{html.escape(r["first_failure"] or "success")}</td><td>{html.escape(contact_text)}</td><td>{" · ".join(links)}</td></tr>')
     count = sum(r["success"] for r in results)
     document = '''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>R2HandoverSim results</title><style>
@@ -35,7 +37,7 @@ body{background:#111b2d;color:#e9f0ff;font:15px system-ui;margin:40px auto;max-w
     if any(r.get("replay_reference") for r in results):
         document += '<p>Reconstructed paper replay. Metrics below are evaluated from these scenes; assigned reference outcomes remain in results.json.</p>'
     document += '<p>Safety source: ' + html.escape('; '.join(sorted({r.get("safe_source", "unspecified") for r in results}))) + '</p>'
-    document += '<div class="scroll"><table><tr><th>Trial</th><th>Split</th>' + ''.join(f'<th>{m.title()}</th>' for m in metrics) + '<th>First failure</th><th>Pad surface distances</th><th>Artifacts</th></tr>' + ''.join(rows) + '</table></div>'
+    document += '<div class="scroll"><table><tr><th>Trial</th><th>Split</th>' + ''.join(f'<th>{m.title()}</th>' for m in metrics) + '<th>Reference outcome</th><th>Evaluated outcome</th><th>Pad distances R / L</th><th>Artifacts</th></tr>' + ''.join(rows) + '</table></div>'
     document += '<p>Release demo results, not paper measurements. Plan checks a provided joint path; Safe uses sampled overlap. S0 omits Affordance. First failure: Stability → Plan → Reach → Affordance → Safe.</p><p><a href="results.json">JSON</a> · <a href="results.csv">CSV</a> · <a href="summary.json">Summary</a></p></html>'
     document = document.replace('</html>', '<p>Table I aggregation (per object, then per split): <a href="paper_table.csv">CSV</a> · <a href="paper_table.json">JSON and conventions</a></p></html>')
     (output/'report.html').write_text(document)

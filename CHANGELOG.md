@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0
+
+- Export resolved replay trials and per-frame tool/object poses, joint positions, timestamps and PhysX hand-overlap observations.
+- Reload resolved asset scenes without applying contact fitting or receiver retargeting twice; detect changed assets and calibration.
+- Keep hand, skeleton and delivery annotations in the same retargeted frame, and make the changed receiver policy explicit for paired experiments.
+- Show reference outcomes, evaluated outcomes and right/left pad distances separately in reports and CSV exports.
+
 ## 0.7.1
 
 - Correct detached local-asset grasps by fitting opposing mesh contact surfaces and insertion depth, calibrating actual Robotiq pad spacing, and verifying both contacts against USD collider triangles.

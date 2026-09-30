@@ -20,10 +20,16 @@ def save_results(results, output):
         writer.writerows(table)
     with (output / "results.csv").open("w", newline="") as stream:
         fields = ["trial_id", "object_id", "variant", "split", "success", "first_failure",
-                  "stability", "plan", "reach", "affordance", "safe", "planning_time_s", "execution_time_s", "total_time_s", "execution_wall_time_s"]
+                  "stability", "plan", "reach", "affordance", "safe", "reference_outcome",
+                  "right_pad_distance_m", "left_pad_distance_m", "planning_time_s", "execution_time_s", "total_time_s", "execution_wall_time_s"]
         writer = csv.DictWriter(stream, fieldnames=fields)
         writer.writeheader()
         for result in results:
-            writer.writerow({k: result.get(k, result["metrics"].get(k)) for k in fields})
+            row = {k: result.get(k, result["metrics"].get(k)) for k in fields}
+            row['reference_outcome'] = (result.get('replay_reference') or {}).get('assigned_outcome')
+            distances = result.get('grasp_contact', {}).get('bilateral_distance_m')
+            if distances:
+                row['right_pad_distance_m'], row['left_pad_distance_m'] = distances
+            writer.writerow(row)
     from .report import write_report
     write_report(results, output)

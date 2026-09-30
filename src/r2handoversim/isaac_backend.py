@@ -114,41 +114,8 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 from .usd_robot import UsdRobot
                 config = trial['asset_robot']
                 asset_robot = UsdRobot(stage, config['usd'], config['translation'])
-                original_grasp = transform(trial['T_object_gripper'])
-                intentional_width_failure = trial.get('replay_reference', {}).get('assigned_outcome') == 'stability'
-                if not intentional_width_failure:
-                    from .grasp_fit import fit_grasp
-                    fitted, contact_fit = fit_grasp(trial['object_mesh_object'], original_grasp, trial['max_opening_m'])
-                    trial['T_object_gripper'] = fitted.tolist()
-                    opening, pads = asset_robot.calibrate_opening(trial['planned_joints'][-1], contact_fit['width_m'])
-                    # Verify both contacts against the measured USD inner pad faces.
-                    contact_fit['measured_pad_geometry'] = pads
-                    contact_fit['linkage_command_m'] = opening
-                    errors = asset_robot.contact_distances(contact_fit['contact_points_tool'])
-                    contact_fit['bilateral_distance_m'] = errors
-                    if max(errors) > .0002:
-                        raise ValueError(f"{trial['object_id']}: object contacts miss the original finger pad surfaces by {errors} m")
-                    trial['asset_contact_fit'] = contact_fit
-                else:
-                    opening = .085
-                    asset_robot.update(trial['planned_joints'][-1], opening)
-                    trial['asset_contact_fit'] = {'status':'intentional_width_failure',
-                        'scope':'No valid grasp; this reference failure is not corrected into a success'}
-                old_goal = tcp(trial['planned_joints'][-1])
-                tool_offset = inverse(old_goal) @ asset_robot.tool_pose()
-                old_object_pose = old_goal @ inverse(original_grasp)
-                new_object_pose = old_goal @ tool_offset @ inverse(trial['T_object_gripper'])
-                shift = new_object_pose @ inverse(old_object_pose)
-                trial['T_tcp_asset_tool'] = tool_offset.tolist()
-                trial['target_T_world_gripper'] = (transform(trial['target_T_world_gripper'])@tool_offset).tolist()
-                trial['hand_boxes_world'] = [moved(b, shift) for b in trial['hand_boxes_world']]
-                trial['palm_position_world'] = points(shift, trial['palm_position_world']).tolist()
-                trial['palm_normal_world'] = (shift[:3,:3]@trial['palm_normal_world']).tolist()
-                if 'hand_mesh_world' in trial:
-                    trial['hand_mesh_world']['vertices'] = points(shift, trial['hand_mesh_world']['vertices']).tolist()
-                # Existing planner checks describe the old proxy tool frame.
-                if 'planning' in trial:
-                    trial['pre_asset_planning'] = trial.pop('planning')
+                from .asset_preparation import prepare
+                trial, opening = prepare(trial, asset_robot)
                 UsdGeom.Imageable(stage.GetPrimAtPath('/World/Table')).MakeInvisible()
             else:
                 UsdGeom.Imageable(stage.GetPrimAtPath('/World/Table')).MakeVisible()
@@ -248,6 +215,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                     world.render()
             query = get_physx_scene_query_interface()
             contacts = []
+            observed_tools = []
             started = time.perf_counter()
             for frame, q in enumerate(trial["executed_joints"]):
                 if not app.is_running():
@@ -277,6 +245,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                         query.overlap_box(carb.Float3(*b["half_extents"]), carb.Float3(*b["center"]),
                                           quaternion(b["rotation"]), report_hit, False)
                 contacts.append(hit_hand[0])
+                observed_tools.append(asset_robot.tool_pose() if asset_robot else trial_tcp(trial, q))
                 if video:
                     capture_file(frame_directory / f"{frame:06d}.png")
             result = evaluate(trial, contacts)
@@ -287,6 +256,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                                         'collider_count':len(asset_robot.colliders), 'T_tcp_asset_tool':trial['T_tcp_asset_tool']}
                 result['object_asset'] = {k:trial['object_mesh_object'][k] for k in ('source_path','source_sha256')}
                 result['grasp_contact'] = trial['asset_contact_fit']
+                result['asset_preparation'] = trial['asset_preparation']
             result["hand_collision"] = hand_collision
             result["execution_wall_time_s"] = time.perf_counter() - started
             result["backend"] = "isaacsim-physx"
@@ -300,7 +270,9 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
             snapshot = (output / f"{trial['id']}.usda").resolve()
             if not stage.Export(str(snapshot)):
                 raise RuntimeError("USD scene export failed")
-            result["artifacts"] = {"scene": snapshot.name}
+            from .trajectory_export import export as export_trajectory
+            exports = export_trajectory(trial, contacts, output, observed_tools if asset_robot else None)
+            result["artifacts"] = {"scene": snapshot.name, **exports}
             if video:
                 from .video import encode_frames
                 destination = output / f"{trial['id']}.mp4"
