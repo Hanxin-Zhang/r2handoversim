@@ -264,3 +264,19 @@ left succeeded; both can poses and screwdriver right failed to find IK for the
 selected FS grasp. All four passed output verification and retain the sampled
 hand and object target. This is a distance/scene review, not a success-rate
 replication. Reference-grasp IK conditioning does not guarantee method-grasp IK.
+
+## Laboratory render preset (after 0.10.0)
+
+The grid floor/embedded point light were replaced visually by grey laboratory
+surfaces and five area lights. The room walls have no collision APIs. Robot
+materials, original object colors, physical vertices and collider triangles
+are preserved. Lab presentation hides Reach/skeleton guides, not metric data.
+
+One resolved 163-frame original-asset screwdriver trajectory was recorded from
+four cameras using path tracing (128 samples, six bounces, temporal denoising
+disabled). Each export passed `verify-output`; every NPZ array, metric,
+selection, receiver pose and contact record matched the previous recording.
+These are four views of one replay, not four independent experiments.
+The 12 default fixtures also passed a fresh realtime lab-preset run (1,077
+frames), with all numeric arrays and results unchanged from the earlier
+fixture regression. The CPU suite passed all 64 tests and the wheel built.

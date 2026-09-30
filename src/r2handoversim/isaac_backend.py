@@ -13,7 +13,7 @@ from .results import save_results
 
 
 def replay(trials, output, headless=False, hold=False, render_every=1, screenshot=False, animation=False, run_id=None, hand_collision="boxes",
-           video=False, video_speed=1., camera="overview"):
+           video=False, video_speed=1., camera="overview", visual_style="lab", renderer="realtime"):
     if render_every < 1:
         raise ValueError("render_every must be at least 1")
     for trial in trials:
@@ -26,6 +26,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
         from . import __version__
         (output / "run.json").write_text(json.dumps({"status": status, "run_id": run_id,
             "package_version": __version__, "camera": camera, "video": video,
+            "visual_style": visual_style, "renderer": renderer,
             "requested_hand_collision": requested_hand_collision, "headless": headless,
             "expected_trials": len(trials), "completed_trials": len(results),
             "error": error}, indent=2))
@@ -39,7 +40,8 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
     saved_argv = sys.argv
     sys.argv = [sys.argv[0]]
     app = SimulationApp({"headless": headless, "width": 1280, "height": 800,
-                         "renderer": "RaytracedLighting"})
+                         "renderer": "PathTracing" if renderer=="pathtraced" else "RaytracedLighting",
+                         "samples_per_pixel_per_frame":128,"max_bounces":6})
     sys.argv = saved_argv
     try:
         from isaacsim.core.api import World
@@ -47,12 +49,18 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
         from pxr import Gf, Usd, UsdGeom, UsdLux, UsdPhysics, PhysicsSchemaTools
         from omni.physx import get_physx_scene_query_interface, get_physx_interface
         import carb
+        if renderer=="pathtraced":
+            # Joint replay authors transforms directly; temporal denoising can leave stale silhouettes.
+            carb.settings.get_settings().set_bool("/rtx/pathtracing/optixDenoiser/temporalMode/enabled",False)
         world = World(stage_units_in_meters=1., physics_dt=1/60, rendering_dt=1/60)
         stage = world.stage
         world.scene.add_default_ground_plane()
         dome = UsdLux.DomeLight.Define(stage, "/World/Light")
         dome.CreateIntensityAttr(1500.)
         set_camera_view(eye=np.array([1.3, -1.8, 1.8]), target=np.array([-.35, -.1, 1.05]))
+
+        from .studio import setup as setup_studio, dress as dress_studio
+        visual_record=setup_studio(stage) if visual_style=="lab" else {"preset":"debug"}
 
         def capture_file(path):
             from omni.kit.viewport.utility import get_active_viewport, capture_viewport_to_file
@@ -120,6 +128,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 stage=world.stage
                 world.scene.add_default_ground_plane()
                 dome=UsdLux.DomeLight.Define(stage,'/World/Light');dome.CreateIntensityAttr(1500.)
+                visual_record=setup_studio(stage) if visual_style=='lab' else {'preset':'debug'}
                 draw_box('/World/Table',box([-.35,0,.70],[.65,.55,.035]),[.24,.29,.36],collider=True)
                 set_camera_view(eye=np.array([1.3,-1.8,1.8]),target=np.array([-.35,-.1,1.05]))
             world.stop()
@@ -145,7 +154,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 UsdGeom.Imageable(stage.GetPrimAtPath('/World/Table')).MakeVisible()
                 UsdPhysics.CollisionAPI(stage.GetPrimAtPath('/World/Table')).GetCollisionEnabledAttr().Set(True)
             camera_record={"mode":camera}
-            if camera == "handover":
+            if camera != "overview":
                 if ('hand_mesh_world' in trial and 'object_mesh_object' in trial
                         and trial.get('receiver_protocol',{}).get('policy')=='fixed_world'):
                     hand_points = np.asarray(trial['hand_mesh_world']['vertices'])
@@ -158,7 +167,12 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                     set_camera_view(eye=target+scale*np.array([.6,-.9,.6]),target=target)
                 else:
                     target = .8*trial_tcp(trial, trial["planned_joints"][-1])[:3,3] + .2*np.asarray(trial["palm_position_world"])
-                    set_camera_view(eye=target+np.array([.48, -.65, .38]), target=target)
+                    eye=target+np.array([.48, -.65, .38])
+                    if camera in ('left','right','top'):
+                        from .camera import choose
+                        eye,_=choose([trial['palm_position_world']],target,[[]],view=camera)
+                    camera_record.update(eye_world=eye.tolist(),target_world=target.tolist())
+                    set_camera_view(eye=eye, target=target)
             frame_directory = output / f"{trial['id']}_frames"
             if video:
                 # A fresh directory prevents stale frames entering a rerun.
@@ -247,6 +261,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 circle.CreateWidthsAttr([.002])
                 circle.SetWidthsInterpolation("constant")
                 circle.CreateDisplayColorAttr([Gf.Vec3f(.15, .8, .3)])
+            if visual_style=='lab': dress_studio(stage,asset_robot)
             get_physx_interface().force_load_physics_from_usd()
             world.reset()
             if asset_robot: asset_robot.update(q0, opening)
@@ -314,7 +329,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 point_op.Set(Gf.Matrix4d(*(trial_tcp(trial,q0)@grasp_inverse).T.reshape(-1).tolist()))
                 world.step(render=True)
                 print(f"{trial['id']}: plan {trial['planning']['status']}, {trial['planning']['checked_configurations']} checked states, {trial['planning']['rejected_contacts']}",flush=True)
-            if (camera=='handover' and asset_robot and 'hand_mesh_world' in trial
+            if (camera!='overview' and asset_robot and 'hand_mesh_world' in trial
                     and trial.get('receiver_protocol',{}).get('policy')=='fixed_world'):
                 from .camera import choose
                 # Preview the saved trajectory without changing any of its geometry.
@@ -330,7 +345,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                         extent=cache.ComputeWorldBound(prim).ComputeAlignedRange()
                         if not extent.IsEmpty(): bounds.append([list(extent.GetMin()),list(extent.GetMax())])
                     bounds_by_pose.append(bounds)
-                eye,diagnostic=choose(trial['hand_mesh_world']['vertices'],target,bounds_by_pose,scale)
+                eye,diagnostic=choose(trial['hand_mesh_world']['vertices'],target,bounds_by_pose,scale,view=camera,object_vertices=object_points)
                 camera_record.update(eye_world=eye.tolist(),target_world=target.tolist(),**diagnostic)
                 set_camera_view(eye=eye,target=target)
                 asset_robot.update(q0,opening)
@@ -403,6 +418,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 result['grasp_contact'] = trial['asset_contact_fit']
                 result['asset_preparation'] = trial['asset_preparation']
             result["camera_configuration"] = camera_record
+            result["visual_configuration"] = {**visual_record,"renderer":renderer,"pathtracing_samples":128 if renderer=="pathtraced" else None}
             result["hand_collision"] = hand_collision
             result['planning'] = trial.get('planning')
             result["execution_wall_time_s"] = time.perf_counter() - started
@@ -430,7 +446,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                     "playback_speed": video_speed, "output_fps": 30, "start_hold_s": 1, "end_hold_s": 2}
                 shutil.rmtree(frame_directory)
             if screenshot:
-                world.render()
+                for _ in range(4): world.render()
                 capture_file(output / f"{trial['id']}.png")
                 result["artifacts"]["screenshot"] = f"{trial['id']}.png"
             if animation:

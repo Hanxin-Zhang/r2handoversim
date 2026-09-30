@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add a neutral laboratory render preset with five area lights, smooth hand
+  shading, optional path tracing and complementary detail camera views.
+
 - Move default receiver palm bounds outward to 0.67–0.85 m horizontal distance
   from the supported robot base; retain preselection reference-IK filtering.
 

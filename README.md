@@ -313,6 +313,14 @@ batch uses generated hand/grasp examples and S0 evaluation because the config
 does not supply original functional-region labels or the paper split. It is
 separate from the three synthetic objects. See [dataset protocol](docs/dataset.md).
 
+## Laboratory rendering
+
+The default lab preset uses a neutral grey background, dark workbench and five
+soft area lights. Use `--renderer pathtraced` for final media and `--camera`
+`handover`, `left`, `right` or `top` for complementary views. See
+[lighting and camera commands](docs/rendering.md). `--visual-style debug` restores
+the original diagnostic appearance.
+
 ## Installation help and release checks
 
 `r2handoversim doctor --isaac --video --asset-config outputs/local_assets.json`

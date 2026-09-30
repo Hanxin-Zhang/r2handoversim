@@ -74,7 +74,9 @@ def main(argv=None):
             p.add_argument("--animation", action="store_true", help="Export a USD with sampled replay animation")
             p.add_argument("--video", action="store_true", help="Record actual viewport frames to MP4 (requires ffmpeg)")
             p.add_argument("--video-speed", type=float, default=1., help="Playback speed; 0.25 gives quarter-speed review")
-            p.add_argument("--camera", choices=["overview", "handover"], default="overview")
+            p.add_argument("--camera", choices=["overview", "handover", "left", "right", "top"], default="overview")
+            p.add_argument("--visual-style", choices=["lab", "debug"], default="lab", help="Lab lighting/materials or original diagnostic scene")
+            p.add_argument("--renderer", choices=["realtime", "pathtraced"], default="realtime", help="Path tracing uses 128 samples per frame for final media")
             p.add_argument("--asset-config", type=Path, help="Local UR5e/Robotiq USD and object mesh configuration")
             p.add_argument("--hand-collision", choices=["boxes", "mesh"], default="boxes",
                            help="Use supplied hand triangles for PhysX safety instead of boxes")
@@ -230,7 +232,8 @@ def main(argv=None):
                 from .local_assets import configuration, attach
                 trials = attach(trials, configuration(args.asset_config))
             results = replay(trials, args.output, args.headless, args.hold, args.render_every, args.screenshot, args.animation,
-                             hand_collision=args.hand_collision, video=args.video, video_speed=args.video_speed, camera=args.camera)
+                             hand_collision=args.hand_collision, video=args.video, video_speed=args.video_speed, camera=args.camera,
+                             visual_style=args.visual_style, renderer=args.renderer)
         else:
             results = [evaluate(t) for t in trials]
             for result in results:

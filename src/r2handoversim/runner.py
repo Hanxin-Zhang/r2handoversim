@@ -25,7 +25,7 @@ def check_completion(output, run_id, expected, returncode):
 
 
 def replay(trials, output, headless=False, hold=False, render_every=1, screenshot=False, animation=False, hand_collision="boxes",
-           video=False, video_speed=1., camera="overview"):
+           video=False, video_speed=1., camera="overview", visual_style="lab", renderer="realtime"):
     if not trials:
         raise ValueError("At least one trial is required")
     if render_every < 1:
@@ -33,8 +33,10 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
     import math
     if not math.isfinite(video_speed) or video_speed <= 0:
         raise ValueError("Video speed must be positive and finite")
-    if camera not in ("overview", "handover"):
-        raise ValueError("Camera must be overview or handover")
+    if camera not in ("overview", "handover", "left", "right", "top"):
+        raise ValueError("Unknown camera preset")
+    if visual_style not in ("lab", "debug") or renderer not in ("realtime", "pathtraced"):
+        raise ValueError("Unknown visual style or renderer")
     if video:
         from .video import require_encoder
         require_encoder()
@@ -55,7 +57,8 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
         "expected_trials": len(trials), "completed_trials": 0}))
     job = {"trials": trials, "output": str(output), "headless": headless, "hold": hold,
            "render_every": render_every, "screenshot": screenshot, "animation": animation, "run_id": run_id,
-           "hand_collision": hand_collision, "video": video, "video_speed": video_speed, "camera": camera}
+           "hand_collision": hand_collision, "video": video, "video_speed": video_speed, "camera": camera,
+           "visual_style": visual_style, "renderer": renderer}
     with tempfile.TemporaryDirectory(prefix="r2handover-job-") as tmp:
         path = Path(tmp) / "job.json"
         path.write_text(json.dumps(job, allow_nan=False))
