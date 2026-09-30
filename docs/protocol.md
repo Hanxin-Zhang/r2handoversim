@@ -58,3 +58,23 @@ from any planner. Keep the transform convention unchanged. A full MoveIt
 backend, robot CAD/articulation, MANO geometry or neural policy can be added
 later without changing failure-order semantics. Do not compare demo success
 rates to the paper's table: assets, splits, geometry and planner differ.
+
+## Predicted hand and execution status (0.2.0)
+
+Optional `hand_mesh_world` contains `vertices` (N x 3 finite coordinates) and
+`faces` (M x 3 integer vertex indices). It is used for rendering only;
+`hand_boxes_world` remains the PhysX collision approximation. Conversion from
+the companion method now preserves a supplied `palm_normal` instead of always
+substituting the procedural default.
+
+`run.json` includes a unique run id, status, expected/completed trial counts and
+an error message when relevant. The parent process checks the matching run id
+and fresh result count after the Kit worker exits. A metric failure is a valid
+completed trial and does not make the CLI fail; simulator/infrastructure errors
+do produce a nonzero exit status.
+
+`--animation` produces an additional self-contained USD with 60 Hz samples for
+the default fixtures (or the rate defined by `dt_s`). These are kinematic
+transform samples, not a saved dynamic articulation simulation. `report.html`
+links only artifacts recorded as produced by the current run; stale screenshots
+from an earlier run in the same directory are not presented as current outputs.

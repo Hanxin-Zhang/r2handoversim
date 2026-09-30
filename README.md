@@ -2,7 +2,7 @@
 
 **Isaac Sim handover demos with offline method outputs and reproducible result files.**
 
-This initial release contains three objects (hammer, screwdriver, bottle) and
+This release contains three objects (hammer, screwdriver, bottle) and
 four illustrative joint-trajectory variants. Isaac Sim renders the scene,
 advances the simulation, and queries PhysX for robot/hand overlap at each frame.
 No baseline model, ROS, MoveIt, external USD asset server, or MANO download is
@@ -39,13 +39,19 @@ Run the complete set without a GUI:
 
 ```bash
 r2handoversim demo --headless --object all --variant all \
-  --render-every 6 --screenshot --output outputs/isaac
+  --render-every 6 --screenshot --animation --output outputs/isaac
 ```
 
-Outputs include `results.json`, `results.csv`, `summary.json`, one self-contained
-final-scene `.usda` per trial, and optional PNG screenshots. Results are saved
-before simulator shutdown. The `.usda` is a final snapshot; run the Python demo
-to replay the motion. `--hold` keeps the GUI open after completion.
+Outputs include `report.html`, `results.json`, `results.csv`, `summary.json`, and
+a final-scene `.usda` per trial. `--screenshot` adds PNGs; `--animation` adds
+`*_animation.usda` files with time-sampled transforms that can be played directly
+in a USD viewer. Open `report.html` to inspect metric flags and artifact links.
+`--hold` keeps the GUI open after completion.
+
+A supervisor process verifies the current run id and completion count after Kit
+exits. Missing simulator dependencies, failed captures, crashes and incomplete
+runs produce a nonzero CLI exit code instead of being mistaken for success.
+`run.json` records the run status. Screenshot capture has a 60-second timeout.
 
 ![Isaac Sim demo](docs/isaac_demo.png)
 
@@ -111,6 +117,12 @@ r2handoversim demo --trial outputs/custom_trial.json --hold
 Alternatively, edit one of `src/r2handoversim/assets/*.json` according to
 [the protocol](docs/protocol.md). Both repositories install and run independently;
 the integration exchanges JSON files, with no cross-repository imports.
+
+If the method scene was produced with `from-prediction`, conversion preserves
+the predicted palm normal and carries the decoded MANO mesh into Isaac Sim for
+display. PhysX continues to evaluate skeletal box proxies; the displayed mesh
+is not the collision shape. MANO-derived outputs remain local/generated assets
+and are not bundled in the repository.
 
 ## Sources
 

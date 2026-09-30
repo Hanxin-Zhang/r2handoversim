@@ -21,6 +21,7 @@ def main(argv=None):
             p.add_argument("--hold", action="store_true", help="Keep GUI open after replay")
             p.add_argument("--render-every", type=int, default=1)
             p.add_argument("--screenshot", action="store_true")
+            p.add_argument("--animation", action="store_true", help="Export a USD with sampled replay animation")
     convert = sub.add_parser("from-intent", help="Convert method scene + selection to a demo joint-replay trial")
     convert.add_argument("--scene", type=Path, required=True)
     convert.add_argument("--selection", type=Path, required=True)
@@ -43,8 +44,8 @@ def main(argv=None):
                 raise ValueError("Trial id must contain only letters, digits, underscores and hyphens")
         args.output.mkdir(parents=True, exist_ok=True)
         if args.command == "demo":
-            from .isaac_backend import replay
-            results = replay(trials, args.output, args.headless, args.hold, args.render_every, args.screenshot)
+            from .runner import replay
+            results = replay(trials, args.output, args.headless, args.hold, args.render_every, args.screenshot, args.animation)
         else:
             results = [evaluate(t) for t in trials]
             for result in results:

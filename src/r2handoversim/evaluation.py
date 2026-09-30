@@ -1,5 +1,6 @@
 """Evaluate replay traces against the five criteria with explicit proxy scope."""
 from collections import Counter
+import re
 import numpy as np
 from .geometry import (box_pose, gripper_boxes, intersects, inverse, moved, points,
                        pose, projected_width, sphere_intersects, transform, unit, vector)
@@ -11,6 +12,16 @@ ORDER = ("stability", "plan", "reach", "affordance", "safe")
 def validate_trial(trial):
     if trial.get("schema_version") != "handover.trial.v1" or trial.get("units") != "m":
         raise ValueError("Expected handover.trial.v1 with units=m")
+    if not isinstance(trial.get("id"), str) or not re.fullmatch(r"[a-zA-Z0-9_-]+", trial["id"]):
+        raise ValueError("Trial id must contain only letters, digits, underscores and hyphens")
+    if "hand_mesh_world" in trial:
+        mesh = trial["hand_mesh_world"]
+        vertices, faces = np.asarray(mesh["vertices"]), np.asarray(mesh["faces"])
+        if (vertices.ndim != 2 or vertices.shape[1] != 3 or len(vertices) < 3
+                or not np.isfinite(vertices).all() or faces.ndim != 2 or faces.shape[1] != 3
+                or not len(faces) or not np.issubdtype(faces.dtype, np.integer)
+                or np.any(faces < 0) or np.any(faces >= len(vertices))):
+            raise ValueError("Invalid hand triangle mesh")
     if trial["split"] not in ("S0", "S1"):
         raise ValueError("Split must be S0 or S1")
     transform(trial["T_object_gripper"])
@@ -69,6 +80,8 @@ def evaluate(trial, physics_contacts=None):
     else:
         if len(physics_contacts) != len(executed):
             raise ValueError("Physics contact trace must cover every executed frame")
+        if not all(isinstance(hit, (bool, np.bool_)) for hit in physics_contacts):
+            raise ValueError("Physics contacts must be boolean observations")
         contact_indices = [i for i, hit in enumerate(physics_contacts) if hit]
         safe_source = "Isaac Sim PhysX overlap queries at every replay frame"
     values = {"stability": bool(stable), "plan": plan, "reach": bool(reach),

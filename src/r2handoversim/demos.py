@@ -3,7 +3,7 @@ from copy import deepcopy
 from importlib.resources import files
 import json
 import numpy as np
-from .geometry import box, inverse, moved, points, pose, transform
+from .geometry import box, inverse, moved, points, pose, transform, unit
 from .robot import GOAL, HOME, interpolate, solve_position, tcp
 
 NAMES = ("hammer", "screwdriver", "bottle")
@@ -27,10 +27,10 @@ def from_selection(scene, selection, steps=90, variant="intent_aware"):
     goal = tcp(GOAL)
     world_object = goal @ inverse(grasp)
     region = scene["intent"]["human_region"]
-    # A fixed, open hand proxy near the intended region. This is not MANO output.
+    # Receiving hand in object coordinates; bundled demos use procedural proxies.
     palm_object = np.array(scene["receiving_hand"]["center"], dtype=float)
     palm_world = points(world_object, palm_object)
-    normal_world = world_object[:3, :3] @ np.array([1., 0., 0.])
+    normal_world = world_object[:3, :3] @ unit(scene["receiving_hand"].get("palm_normal", [1., 0., 0.]))
     hand_boxes = [moved(b, world_object) for b in scene["receiving_hand"]["boxes"]]
     planned = interpolate(HOME, GOAL, steps)
     executed = deepcopy(planned)
@@ -41,10 +41,10 @@ def from_selection(scene, selection, steps=90, variant="intent_aware"):
     elif variant == "missed_delivery":
         # Deliberately stop at home instead of reaching the planned goal.
         executed = [HOME.tolist()] * steps
-    return {"schema_version": "handover.trial.v1", "units": "m",
+    trial = {"schema_version": "handover.trial.v1", "units": "m",
             "id": f"{scene['object']['id']}_{variant}", "object_id": scene["object"]["id"],
             "variant": variant, "split": "S0" if scene["object"]["id"] == "bottle" else "S1",
-            "provenance": "Procedural release demo; not a baseline reproduction or paper trial",
+            "provenance": scene.get("provenance", "User supplied scene"),
             "T_object_gripper": grasp.tolist(), "target_T_world_gripper": goal.tolist(),
             "object_boxes": deepcopy(scene["object"]["boxes"]),
             "usage_boxes": deepcopy(scene["object"]["usage_regions"][region]),
@@ -52,3 +52,8 @@ def from_selection(scene, selection, steps=90, variant="intent_aware"):
             "palm_normal_world": normal_world.tolist(), "reach_offset_m": .12,
             "reach_radius_m": .10, "max_opening_m": .085, "dt_s": 1/60,
             "planned_joints": planned, "executed_joints": executed}
+    if "mesh" in scene["receiving_hand"]:
+        mesh = scene["receiving_hand"]["mesh"]
+        trial["hand_mesh_world"] = {"vertices": points(world_object, mesh["vertices"]).tolist(),
+                                    "faces": deepcopy(mesh["faces"])}
+    return trial

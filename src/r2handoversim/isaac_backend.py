@@ -13,7 +13,7 @@ from .robot import tcp
 from .results import save_results
 
 
-def replay(trials, output, headless=False, hold=False, render_every=1, screenshot=False):
+def replay(trials, output, headless=False, hold=False, render_every=1, screenshot=False, animation=False, run_id=None):
     if render_every < 1:
         raise ValueError("render_every must be at least 1")
     for trial in trials:
@@ -22,7 +22,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
     output.mkdir(parents=True, exist_ok=True)
     results = []
     def save_run(status, error=None):
-        (output / "run.json").write_text(json.dumps({"status": status,
+        (output / "run.json").write_text(json.dumps({"status": status, "run_id": run_id,
             "expected_trials": len(trials), "completed_trials": len(results),
             "error": error}, indent=2))
     save_run("starting")
@@ -86,6 +86,16 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
             UsdGeom.Xform.Define(stage, "/World/Trial")
             for i, b in enumerate(trial["hand_boxes_world"]):
                 draw_box(f"/World/Trial/Hand/part_{i}", b, [1., .64, .31], collider=True)
+                if "hand_mesh_world" in trial:
+                    UsdGeom.Imageable(stage.GetPrimAtPath(f"/World/Trial/Hand/part_{i}")).MakeInvisible()
+            if "hand_mesh_world" in trial:
+                data = trial["hand_mesh_world"]
+                mesh = UsdGeom.Mesh.Define(stage, "/World/Trial/HandVisual")
+                mesh.CreatePointsAttr([Gf.Vec3f(*p) for p in data["vertices"]])
+                mesh.CreateFaceVertexCountsAttr([3] * len(data["faces"]))
+                mesh.CreateFaceVertexIndicesAttr(np.asarray(data["faces"]).reshape(-1).tolist())
+                mesh.CreateSubdivisionSchemeAttr("none")
+                mesh.CreateDisplayColorAttr([Gf.Vec3f(1., .64, .31)])
             world.set_simulation_dt(physics_dt=trial["dt_s"], rendering_dt=trial["dt_s"])
             q0 = trial["executed_joints"][0]
             robot_ops = [draw_box(f"/World/Trial/Robot/part_{i}", b, [.35, .6, .9])
@@ -142,9 +152,12 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
             # Some Kit installations terminate Python during app.close(). Persist first.
             save_results(results, output)
             save_run("running")
-            # Self-contained USD contains original primitives only.
+            # Self-contained USD includes procedural shapes and any supplied hand mesh.
             world.stop()
-            stage.Export(str((output / f"{trial['id']}.usda").resolve()))
+            snapshot = (output / f"{trial['id']}.usda").resolve()
+            if not stage.Export(str(snapshot)):
+                raise RuntimeError("USD scene export failed")
+            result["artifacts"] = {"scene": snapshot.name}
             if screenshot:
                 from omni.kit.viewport.utility import get_active_viewport, capture_viewport_to_file
                 world.render()
@@ -152,10 +165,20 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 # Let the asynchronous capture complete before changing the stage.
                 import asyncio
                 done = asyncio.ensure_future(capture.wait_for_result())
+                deadline = time.monotonic() + 60
                 while not done.done():
                     app.update()
+                    if time.monotonic() > deadline:
+                        done.cancel()
+                        raise RuntimeError("Screenshot capture timed out after 60 seconds")
                 done.result()
+                result["artifacts"]["screenshot"] = f"{trial['id']}.png"
+            if animation:
+                from .animation import bake
+                bake(snapshot, output / f"{trial['id']}_animation.usda", trial)
+                result["artifacts"]["animation"] = f"{trial['id']}_animation.usda"
             print(f"{trial['id']}: {result['first_failure'] or 'success'} (Isaac Sim)", flush=True)
+        save_results(results, output)
         save_run("succeeded")
         while hold and not headless and app.is_running():
             app.update()

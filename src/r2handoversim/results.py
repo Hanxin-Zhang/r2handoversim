@@ -16,3 +16,5 @@ def save_results(results, output):
         writer.writeheader()
         for result in results:
             writer.writerow({k: result.get(k, result["metrics"].get(k)) for k in fields})
+    from .report import write_report
+    write_report(results, output)
