@@ -14,6 +14,10 @@ def bake(snapshot, destination, trial):
     stage.SetEndTimeCode(len(trial["executed_joints"])-1)
     grasp_inverse = inverse(trial["T_object_gripper"])
     for frame, q in enumerate(trial["executed_joints"]):
+        cloud = stage.GetPrimAtPath("/World/Trial/ObjectCloud")
+        if cloud:
+            op = UsdGeom.Xformable(cloud).GetOrderedXformOps()[0]
+            op.Set(Gf.Matrix4d(*(tcp(q)@grasp_inverse).T.reshape(-1).tolist()), Usd.TimeCode(frame))
         robot = robot_geometry(trial, q)
         objects = [moved(b, tcp(q) @ grasp_inverse) for b in trial["object_boxes"]]
         for group, boxes in (("Robot", robot), ("Object", objects)):

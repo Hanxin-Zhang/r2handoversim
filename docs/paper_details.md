@@ -105,3 +105,10 @@ Still absent: original 16 OakInk meshes and splits, 400 curated interactions,
 top-100 Multi-GraspLLM candidates, MoveIt/URDF robot collision geometry, original
 baseline models, hardware trials and participant ratings. The three procedural
 objects and illustrative split assignments are clearly separate from that data.
+
+## Local data now connected (0.4.0)
+
+The original han config's 16 available object point clouds and neural input
+cache can now be imported directly. This restores those local object inputs;
+original triangle meshes, grasp/region annotations and split labels remain
+unavailable in that config. See [dataset import and provenance](dataset.md).

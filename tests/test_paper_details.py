@@ -55,3 +55,22 @@ class PaperDetailsTests(unittest.TestCase):
     def test_mesh_mode_requires_mesh(self):
         with self.assertRaisesRegex(ValueError,'hand_mesh_world'):
             replay([load_demo('hammer')],'/tmp/unused-r2handover-output',hand_collision='mesh')
+
+    def test_imported_points_and_explicit_split_survive_conversion(self):
+        from r2handoversim.demos import from_selection
+        cloud=[[0,0,0],[.01,0,0],[0,.01,0],[0,0,.01]]
+        scene={'schema_version':'handover.scene.v1','object':{'id':'actual','boxes':[box([0,0,0],[.01]*3)],
+            'surface_points':cloud,'usage_regions':{'zone':[box([0,0,0],[.005]*3)]}},
+            'intent':{'human_region':'zone'},'receiving_hand':{'center':[-.1,0,0],'boxes':[box([-.1,0,0],[.01]*3)]},
+            'evaluation_split':'S0','source_data':{'asset_sha256':'test'},'annotation_status':'generated'}
+        selection={'schema_version':'handover.selection.v1','status':'ok','object_id':'actual',
+                   'selected':{'id':'g','T_object_gripper':pose().tolist()}}
+        trial=from_selection(scene,selection)
+        self.assertEqual(trial['object_points_object'],cloud)
+        self.assertEqual(trial['split'],'S0')
+        self.assertEqual(trial['source_data']['asset_sha256'],'test')
+
+    def test_invalid_imported_cloud_is_rejected(self):
+        from r2handoversim.evaluation import validate_trial
+        trial=load_demo('hammer');trial['object_points_object']=[[float('nan'),0,0]]*4
+        with self.assertRaisesRegex(ValueError,'point cloud'): validate_trial(trial)

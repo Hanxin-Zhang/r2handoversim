@@ -24,6 +24,10 @@ def validate_trial(trial):
             raise ValueError("Invalid hand triangle mesh")
     if trial["split"] not in ("S0", "S1"):
         raise ValueError("Split must be S0 or S1")
+    if "object_points_object" in trial:
+        cloud = np.asarray(trial["object_points_object"])
+        if cloud.ndim != 2 or cloud.shape[1] != 3 or len(cloud) < 4 or not np.isfinite(cloud).all():
+            raise ValueError("Object point cloud must contain finite XYZ points")
     transform(trial["T_object_gripper"])
     transform(trial["target_T_world_gripper"])
     if not trial["planned_joints"] or not trial["executed_joints"]:
@@ -111,7 +115,8 @@ def evaluate(trial, physics_contacts=None):
             "planning_time_s": trial.get("planning", {}).get("time_s"), "execution_wall_time_s": None,
             "execution_time_s": (len(executed)-1)*trial["dt_s"],
             "total_time_s": (trial["planning"]["time_s"]+(len(executed)-1)*trial["dt_s"]) if "planning" in trial else None,
-            "scope": "Procedural geometry and UR5e joint replay; not original paper trials",
+            "scope": trial.get("provenance", "Procedural geometry and UR5e joint replay; not original paper trials"),
+            "source_data": trial.get("source_data"), "annotation_status": trial.get("annotation_status"),
             "plan_scope": plan_scope}
 
 

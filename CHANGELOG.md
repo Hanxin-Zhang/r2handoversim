@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0
+
+- Convert imported dataset manifests to batch trials and accept `--trials` arrays.
+- Render original object point clouds in Isaac Sim and animate them with the grasp.
+- Preserve source hashes, annotation status and explicitly supplied split labels.
+- Validate all 16 locally configured objects and a real-cloud Text2HOI example.
+
 ## 0.3.0
 
 - Add numerical full-pose IK and a portable RRT-Connect planner, with sampled

@@ -123,6 +123,16 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
             grasp_inverse = inverse(trial["T_object_gripper"])
             object_ops = [draw_box(f"/World/Trial/Object/part_{i}", moved(b, tcp(q0) @ grasp_inverse), [.2, .85, .65])
                           for i, b in enumerate(trial["object_boxes"])]
+            point_op = None
+            if "object_points_object" in trial:
+                for i in range(len(object_ops)):
+                    UsdGeom.Imageable(stage.GetPrimAtPath(f"/World/Trial/Object/part_{i}")).MakeInvisible()
+                cloud = UsdGeom.Points.Define(stage, "/World/Trial/ObjectCloud")
+                cloud.CreatePointsAttr([Gf.Vec3f(*p) for p in trial["object_points_object"]])
+                cloud.CreateWidthsAttr([.0015]*len(trial["object_points_object"]))
+                cloud.CreateDisplayColorAttr([Gf.Vec3f(.2, .85, .65)])
+                point_op = UsdGeom.Xformable(cloud.GetPrim()).AddTransformOp()
+                point_op.Set(Gf.Matrix4d(*(tcp(q0)@grasp_inverse).T.reshape(-1).tolist()))
             center = np.asarray(trial["palm_position_world"]) + trial["reach_offset_m"] * np.asarray(trial["palm_normal_world"])/np.linalg.norm(trial["palm_normal_world"])
             for axis in range(3):
                 circle = UsdGeom.BasisCurves.Define(stage, f"/World/Trial/ReachRegion/ring_{axis}")
@@ -152,6 +162,8 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                     update_box(op, b)
                 for op, b in zip(object_ops, trial["object_boxes"]):
                     update_box(op, moved(b, tcp(q) @ grasp_inverse))
+                if point_op is not None:
+                    point_op.Set(Gf.Matrix4d(*(tcp(q)@grasp_inverse).T.reshape(-1).tolist()))
                 world.step(render=frame % render_every == 0)
                 hit_hand = [False]
 

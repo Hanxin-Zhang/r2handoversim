@@ -15,6 +15,7 @@ def main(argv=None):
         p.add_argument("--object", choices=[*NAMES, "all"], default="hammer")
         p.add_argument("--variant", choices=[*VARIANTS, "all"], default="intent_aware")
         p.add_argument("--trial", type=Path, help="Custom handover.trial.v1 JSON instead of bundled demos")
+        p.add_argument("--trials", type=Path, help="JSON array of custom trials, e.g. from-dataset output")
         p.add_argument("--output", type=Path, default=Path(f"outputs/{command}"))
         if command == "demo":
             p.add_argument("--headless", action="store_true")
@@ -35,8 +36,37 @@ def main(argv=None):
     plan.add_argument("--seed", type=int, default=0)
     plan.add_argument("--iterations", type=int, default=600)
     plan.add_argument("--output", type=Path, default=Path("outputs/planned_trial.json"))
+    dataset = sub.add_parser("from-dataset", help="Convert a method dataset manifest to offline demo trials")
+    dataset.add_argument("--manifest", type=Path, required=True)
+    dataset.add_argument("--output", type=Path, default=Path("outputs/dataset_trials"))
     args = parser.parse_args(argv)
     try:
+        if args.command == "from-dataset":
+            manifest = json.loads(args.manifest.read_text())
+            if manifest.get("schema_version") != "handover.dataset.v1":
+                raise ValueError("Expected handover.dataset.v1 manifest")
+            root = args.manifest.resolve().parent
+            trials, skipped = [], []
+            args.output.mkdir(parents=True, exist_ok=True)
+            for record in manifest["objects"]:
+                paths = [(root/record[key]).resolve() for key in ("scene", "selection")]
+                if not all(p.is_relative_to(root) for p in paths):
+                    raise ValueError("Dataset input escapes its manifest directory")
+                scene, selection = [json.loads(p.read_text()) for p in paths]
+                if selection.get("status") != "ok":
+                    skipped.append({"object_id": record["object_id"], "reason": selection.get("status")})
+                    continue
+                trial = from_selection(scene, selection, variant="configured_object_demo")
+                validate_trial(trial)
+                trials.append(trial)
+                (args.output/f"{trial['id']}.json").write_text(json.dumps(trial, allow_nan=False))
+            (args.output/"trials.json").write_text(json.dumps(trials, allow_nan=False))
+            (args.output/"conversion.json").write_text(json.dumps({"converted": len(trials), "skipped": skipped,
+                "source_missing": manifest.get("missing", []), "scope": "configured objects, generated offline hand/grasp demos"}, indent=2))
+            print(f"Converted {len(trials)} trials, skipped {len(skipped)}. Batch: {(args.output/'trials.json').resolve()}")
+            if not trials:
+                parser.exit(2, "No feasible selections to replay\n")
+            return
         if args.command in ("from-intent", "plan"):
             if args.command == "from-intent":
                 trial = from_selection(json.loads(args.scene.read_text()), json.loads(args.selection.read_text()),
@@ -52,9 +82,13 @@ def main(argv=None):
             if trial.get("planning", {}).get("status") == "failed":
                 parser.exit(2, f"Planning failed: {trial['planning']['reason']}; failed trial saved for evaluation\n")
             return
-        trials = ([json.loads(args.trial.read_text())] if args.trial else
+        if args.trial and args.trials:
+            raise ValueError("Choose --trial or --trials, not both")
+        trials = (json.loads(args.trials.read_text()) if args.trials else [json.loads(args.trial.read_text())] if args.trial else
                   [load_demo(n, v) for n in (NAMES if args.object == "all" else [args.object])
                    for v in (VARIANTS if args.variant == "all" else [args.variant])])
+        if not isinstance(trials, list) or not trials:
+            raise ValueError("Expected a nonempty JSON trial array")
         for trial in trials:
             validate_trial(trial)
             import re

@@ -146,6 +146,24 @@ per object, object means per split, then equal S0/S1 Avg. S0 Affordance is null;
 only its contribution to Avg is zero, following Table I's footnote. Missing
 timing values remain null. See [paper-to-code mapping and commands](docs/paper_details.md).
 
+## Run all locally configured objects
+
+After the method imports the original dataset config:
+
+```bash
+r2handoversim from-dataset \
+  --manifest /path/to/intent-handover/outputs/han_dataset/dataset.json \
+  --output outputs/han_trials
+r2handoversim demo --trials outputs/han_trials/trials.json --headless \
+  --screenshot --render-every 12 --output outputs/han_isaac
+```
+
+The 16 available original point clouds are displayed directly and move with the
+object. Geometry metrics still use explicit occupied-cell box proxies. This
+batch uses generated hand/grasp examples and S0 evaluation because the config
+does not supply original functional-region labels or the paper split. It is
+separate from the three synthetic objects. See [dataset protocol](docs/dataset.md).
+
 ## Sources
 
 - Paper/project: [R2HandoverSim](https://robot-future.github.io/r2handoversim/).

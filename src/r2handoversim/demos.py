@@ -51,7 +51,7 @@ def from_selection(scene, selection, steps=90, variant="intent_aware", delivery=
         executed = [HOME.tolist()] * steps
     trial = {"schema_version": "handover.trial.v1", "units": "m",
             "id": f"{scene['object']['id']}_{variant}", "object_id": scene["object"]["id"],
-            "variant": variant, "split": "S0" if scene["object"]["id"] == "bottle" else "S1",
+            "variant": variant, "split": scene.get("evaluation_split", "S0" if scene["object"]["id"] == "bottle" else "S1"),
             "provenance": scene.get("provenance", "User supplied scene"),
             "T_object_gripper": grasp.tolist(), "target_T_world_gripper": goal.tolist(),
             "object_boxes": deepcopy(scene["object"]["boxes"]),
@@ -60,6 +60,10 @@ def from_selection(scene, selection, steps=90, variant="intent_aware", delivery=
             "palm_normal_world": normal_world.tolist(), "reach_offset_m": .12,
             "reach_radius_m": .10, "max_opening_m": .085, "dt_s": 1/60,
             "planned_joints": planned, "executed_joints": executed}
+    if "surface_points" in scene["object"]:
+        trial["object_points_object"] = deepcopy(scene["object"]["surface_points"])
+        trial["source_data"] = deepcopy(scene.get("source_data", {}))
+        trial["annotation_status"] = scene.get("annotation_status", "user supplied")
     if "mesh" in scene["receiving_hand"]:
         mesh = scene["receiving_hand"]["mesh"]
         trial["hand_mesh_world"] = {"vertices": points(world_object, mesh["vertices"]).tolist(),

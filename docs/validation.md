@@ -74,3 +74,19 @@ continuous collision detection or the original paper's numeric results.
   both source directories.
 - These checks do not validate MoveIt equivalence, mesh-accurate robot planning,
   original 16-object splits, or the paper's quantitative performance.
+
+## 0.4.0 configured-data follow-up
+
+- Twenty-two CPU tests pass, including source point-cloud/split preservation and
+  malformed cloud rejection.
+- All 16 configured han object demos completed in Isaac Sim 5.0, each exporting
+  its original point-cloud display, result and screenshot. All active demo S0
+  criteria passed; this is not a paper SR because annotations/trajectories are
+  generated release examples.
+- The actual binoculars cloud plus a left-hand Text2HOI/MANO prediction ran in
+  triangle-hand-collision mode and passed all active criteria. Its screenshot
+  was visually inspected. The animated USD was exported.
+- Standalone 0.4.0 wheels were built, installed independently, and exercised
+  through config import, dataset batch conversion and offline evaluation.
+- Reopened the neural-object animation in Isaac Sim's USD API: all 8192 source
+  points were retained and the object cloud had 90 animated transform samples.

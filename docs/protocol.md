@@ -96,3 +96,11 @@ measured planning), and a measured `planning_time_s` for new plans. Isaac Sim
 results record `hand_collision` and the actual collision source.
 `paper_table.csv/json` follows Table I object and split weights; the existing
 `summary.json` remains a pooled trial summary.
+
+## Configured object clouds (0.4.0)
+
+Optional `object_points_object` contains original object-frame XYZ points for
+USD Points display/animation. `object_boxes` remains the metric/collision proxy.
+`source_data` and `annotation_status` survive conversion into results. `--trials`
+accepts a nonempty JSON array of complete trial objects; `from-dataset` creates
+such a batch from the companion import manifest. See [dataset.md](dataset.md).
