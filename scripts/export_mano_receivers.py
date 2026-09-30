@@ -55,7 +55,7 @@ def main():
             finger_direction_mesh=(joints[4]-joints[0]).tolist(),
             source_kind='Neutral MANO rest template from locally licensed model; not an interaction sequence'))
     config=dict(schema_version='handover.receivers.v1',templates=templates,sampling={
-        'position_bounds_m':[[-.50,-.43,.85],[-.35,-.20,.93]],
+        'position_bounds_m':[[-.72,-.45,.88],[-.60,-.30,.98]],
         'rpy_bounds_deg':[[-25,-25,-150],[25,25,-50]],'require_reference_ik':True})
     (args.output/'config.json').write_text(json.dumps(config,indent=2)+'\n')
     print((args.output/'config.json').resolve())

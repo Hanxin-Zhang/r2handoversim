@@ -33,6 +33,14 @@ and mesh scale must be explicit; there is no automatic unit guessing. The palm
 frame uses +Z outward and +X toward the fingers. The mesh can be a MANO export;
 the repository does not redistribute MANO model weights or hand templates.
 
+The example places the palm in world X `[-0.72, -0.60]`, Y `[-0.45, -0.30]`,
+Z `[0.88, 0.98]` metres. With the supported robot base at `[0, 0, 0.75]`,
+this gives a horizontal base-to-palm distance of 0.67–0.85 m, outward from
+the earlier compact demo region (0.40–0.66 m). Reference IK still filters
+unreachable proposals before method selection; it does not move failed trials
+closer to the robot. These are configurable demo bounds, not recovered paper
+sampling limits. Existing saved trials retain their original hand poses.
+
 1. Calibrate **all** candidate grasps against the original robot pads before
    the method filters/ranks candidates:
 

@@ -246,3 +246,21 @@ promise that every subsequently selected grasp has a feasible Plan. This is an
 explicit construction of a reachable set, not recovery of the unpublished
 original sampling distribution. Earlier bounded-workspace results retain their
 original labels and are not retroactively called conditioned samples.
+
+
+## Outward receiver region (after 0.10.0)
+
+The default region was moved farther from the supported robot base in response
+to review of the camera replay. Palm world bounds are now X [-0.72, -0.60],
+Y [-0.45, -0.30], Z [0.88, 0.98] m (horizontal base distance 0.67–0.85 m).
+The old 33-case records and published 0.10.0 archives keep their original settings.
+
+A new seed-27 draw used two receiver poses per object, alternating left/right,
+with reference IK enabled. Can accepted two of four proposals; screwdriver
+accepted both proposals. The four accepted palm distances were 0.708, 0.780,
+0.731 and 0.743 m. All method selections were recomputed on these new scenes.
+Actual Isaac Sim FS replay completed four records / 166 frames: screwdriver
+left succeeded; both can poses and screwdriver right failed to find IK for the
+selected FS grasp. All four passed output verification and retain the sampled
+hand and object target. This is a distance/scene review, not a success-rate
+replication. Reference-grasp IK conditioning does not guarantee method-grasp IK.

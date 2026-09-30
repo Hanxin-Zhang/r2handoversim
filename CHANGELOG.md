@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Move default receiver palm bounds outward to 0.67–0.85 m horizontal distance
+  from the supported robot base; retain preselection reference-IK filtering.
+
 ## 0.10.0
 
 - Sample visible left/right hand meshes with deterministic SE(3) poses before
