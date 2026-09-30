@@ -227,7 +227,7 @@ traces. Simulation duration and simulator wall time have separate fields. See [p
 ## Offline checks and your own traces
 
 ```bash
-python -m pip install -e '.[planning]'
+python -m pip install -e '.[planning,assets]'
 r2handoversim evaluate --object all --variant all --output outputs/offline
 python -m unittest discover -s tests -v
 ```
