@@ -81,7 +81,6 @@ planner. The legacy asset-demo retargeting workflow changes the receiving hand
 during fitting. Use `receiver-scenes` before method selection for fixed-world
 comparisons.
 
-The original asset adapter supports the documented `danilab_ur5e` assembly;
-arbitrary UR5e/Robotiq USDs may have different frames, joints and colliders and
-are not interchangeable. Users without those assets can run the bundled
-procedural demos immediately after installing Isaac Sim.
+The original asset adapter uses the documented `danilab_ur5e` assembly and its
+frames, joints and colliders. The bundled procedural demos provide a
+self-contained starting point immediately after installing Isaac Sim.

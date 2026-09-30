@@ -11,8 +11,8 @@ hands before method selection and records the fixed hand pose with every trace.
 The bundled fixtures contain three objects (hammer, screwdriver, bottle) and
 four illustrative joint-trajectory variants. Isaac Sim renders the scene,
 advances the simulation, and queries PhysX for robot/hand overlap at each frame.
-No baseline model, ROS, MoveIt, external USD asset server, or MANO download is
-needed to run the examples.
+The examples are self-contained and run directly in the Isaac Sim Python
+environment with the bundled fixtures.
 
 The default fixtures use nominal UR5e DH kinematics with **procedural link/parallel-gripper
 proxies**, an 85 mm aperture, and a fixed receiving-hand proxy. The bundled examples
@@ -42,9 +42,8 @@ For an Isaac Sim installation that supplies `python.sh`, from this repository:
 /path/to/isaac-sim/python.sh scripts/run_isaac.py demo --object hammer --hold
 ```
 
-The script resolves this repository relative to itself. There are no developer
-machine paths in the runtime. Normal system Python is sufficient for the
-offline `evaluate` command, but **not** for the main Isaac Sim `demo` command.
+The script resolves this repository relative to itself. Use normal system
+Python for offline `evaluate`, and the Isaac Sim Python environment for `demo`.
 
 Run the complete set without a GUI:
 
@@ -100,7 +99,7 @@ r2handoversim demo --trials outputs/local_trials/trials.json \
 ```
 
 Omit `--objects bottle` to generate demos for every OBJ in the configured folder.
-This workflow needs no method checkout, model weights or dataset manifest. It
+This workflow runs directly from the configured local assets. It
 chooses a geometric approach, a static hand proxy and an authored 90-frame
 trajectory. Its S0 metrics use object bounding boxes. Failed fits stop with an
 error; outputs are authored geometric replay examples. If you already
@@ -113,7 +112,8 @@ and collision shapes. The example placement aligns this assembly with the
 release's nominal UR5e base. Object names must match the OBJ filenames;
 `object_aliases` handles `hammer` → `hammers`. Mesh vertices use meters in the
 same object frame as the configured point cloud. Source paths and hashes are
-recorded in results. Assets remain local and are not redistributed.
+recorded in results. Configure external assets through local paths under their
+respective source terms.
 
 The commands above run **legacy adapted geometry demos**. For unchanged method
 selections and paired fixed-hand comparisons, follow the
@@ -126,9 +126,9 @@ replay refits the supplied approach to opposing object-mesh surfaces inside the
 flat pads, and inverts the actual Robotiq linkage to set the local contact gap.
 The original grasp is retained in `grasp_contact`; each side must be within
 0.2 mm of its USD collider surface, otherwise the replay fails explicitly.
-Reports show both surface distances. This geometric contact check does not
-measure frictional holding force. Authored Stability failures remain ungrasped. Playback
-moves the USD links kinematically and attaches the object rigidly. PhysX Safe
+Reports show both surface distances for geometric contact validation. Authored
+Stability failures remain ungrasped. Playback moves the USD links kinematically
+and attaches the object rigidly. PhysX Safe
 checks use the USD robot colliders; Plan/Reach/Affordance retain the documented
 geometric predicates. Results retain the source planning metadata. MP4 and time-sampled USD exports use the
 same joint trajectory. A decoded MANO mesh from the method pipeline is supported
@@ -148,8 +148,8 @@ r2handoversim demo --trial outputs/asset_replay/bottle_local_mesh_trial.json --h
 ```
 
 The resolved file embeds the object mesh and references the local robot USD.
-It does not need `--asset-config` again. The adapter rechecks the original pad
-contacts without refitting or moving the hand a second time. Changed mesh,
+The embedded asset configuration supports direct reload. The adapter rechecks
+the original pad contacts while preserving the saved grasp and hand pose. Changed mesh,
 robot placement, grasp or tool calibration is rejected; regenerate from the
 original input when changing assets.
 
@@ -261,8 +261,7 @@ the predicted palm normal and carries the decoded MANO mesh into Isaac Sim for
 display. Add `--hand-collision mesh` to use its triangles for PhysX safety
 queries. Without this flag, collision evaluation uses the skeletal box proxies.
 The portable CPU planner uses boxes; the fixed-receiver workflow uses live PhysX
-mesh queries and exports verifiable observations for offline checks. MANO-derived outputs remain local/generated assets
-and are not bundled in the repository.
+mesh queries and exports verifiable observations for offline checks. MANO-derived outputs are stored as local generated assets.
 
 ## Complete method runs and paired ablations
 
@@ -319,8 +318,8 @@ the original diagnostic appearance.
 
 `r2handoversim doctor --isaac --video --asset-config outputs/local_assets.json`
 checks dependencies, encoder availability and local mesh files before launching
-Kit. Omit optional flags for an offline-only installation. It does not start the
-GPU runtime; the documented `demo` smoke run verifies that separately.
+Kit. Omit optional flags for an offline-only installation. Follow the dependency
+check with the documented `demo` smoke run to verify the GPU runtime.
 
 See [installation and troubleshooting](docs/installation.md),
 [release checklist](docs/release.md), [validation history](docs/validation.md),
@@ -333,5 +332,5 @@ and [external software and asset terms](THIRD_PARTY.md).
 - Simulator: [NVIDIA Isaac Sim documentation](https://docs.isaacsim.omniverse.nvidia.com/5.0.0/index.html).
 
 New release code and procedural fixtures are MIT. Isaac Sim is separately
-installed under NVIDIA's terms. No NVIDIA robot USDs, original dataset meshes,
-MANO models, or participant data are bundled.
+installed under NVIDIA's terms. Configure original robot USDs, dataset meshes
+and MANO models as external local assets under their respective source terms.
