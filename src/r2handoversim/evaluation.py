@@ -9,6 +9,10 @@ from .robot import arm_boxes, joints, tcp
 ORDER = ("stability", "plan", "reach", "affordance", "safe")
 
 
+def trial_tcp(trial, q):
+    return tcp(q) @ transform(trial.get("T_tcp_asset_tool", np.eye(4)))
+
+
 def validate_trial(trial):
     if trial.get("schema_version") != "handover.trial.v1" or trial.get("units") != "m":
         raise ValueError("Expected handover.trial.v1 with units=m")
@@ -22,6 +26,18 @@ def validate_trial(trial):
                 or not len(faces) or not np.issubdtype(faces.dtype, np.integer)
                 or np.any(faces < 0) or np.any(faces >= len(vertices))):
             raise ValueError("Invalid hand triangle mesh")
+    if "T_tcp_asset_tool" in trial:
+        transform(trial["T_tcp_asset_tool"])
+    if "object_mesh_object" in trial:
+        mesh = trial["object_mesh_object"]
+        vertices, faces, colors = (np.asarray(mesh[k]) for k in ("vertices", "faces", "colors"))
+        if (vertices.ndim != 2 or vertices.shape[1] != 3 or len(vertices) < 3
+                or not np.isfinite(vertices).all() or faces.ndim != 2 or faces.shape[1] != 3
+                or not len(faces) or not np.issubdtype(faces.dtype, np.integer)
+                or np.any(faces < 0) or np.any(faces >= len(vertices))
+                or colors.shape != vertices.shape or not np.isfinite(colors).all()
+                or np.any(colors < 0) or np.any(colors > 1)):
+            raise ValueError("Invalid object triangle mesh or vertex colors")
     if trial["split"] not in ("S0", "S1"):
         raise ValueError("Split must be S0 or S1")
     if "object_points_object" in trial:
@@ -58,7 +74,7 @@ def validate_trial(trial):
 def robot_geometry(trial, q, width=None):
     if width is None:
         width = projected_width(trial["object_boxes"], transform(trial["T_object_gripper"])[:3, 1])
-    return arm_boxes(q) + [moved(b, tcp(q)) for b in gripper_boxes(min(width, trial["max_opening_m"]))]
+    return arm_boxes(q) + [moved(b, trial_tcp(trial, q)) for b in gripper_boxes(min(width, trial["max_opening_m"]))]
 
 
 def hand_contact(trial, q, width):
@@ -72,7 +88,7 @@ def evaluate(trial, physics_contacts=None):
     stable = width <= trial["max_opening_m"] + 1e-9
     planned, executed = trial["planned_joints"], trial["executed_joints"]
     target = transform(trial["target_T_world_gripper"])
-    end = tcp(planned[-1])
+    end = trial_tcp(trial, planned[-1])
     endpoint_ok = np.linalg.norm(end[:3, 3] - target[:3, 3]) <= .005 and np.allclose(end[:3, :3], target[:3, :3], atol=.01)
     limits_ok = all(np.all(np.abs(joints(q)) <= 2*np.pi) for q in planned)
     # A sampled path check, no planner search, self-collision or obstacle checking.
@@ -89,7 +105,7 @@ def evaluate(trial, physics_contacts=None):
                 for q in edge_samples(np.asarray(a), np.asarray(b))[1:])
         plan = bool(plan and clear)
         plan_scope = "Numerical pose IK + RRT-Connect; robot/object/hand/obstacle box checks, sampled edges and nonadjacent arm checks"
-    final_world_object = tcp(executed[-1]) @ inverse(grasp)
+    final_world_object = trial_tcp(trial, executed[-1]) @ inverse(grasp)
     delivered = [moved(b, final_world_object) for b in trial["object_boxes"]]
     sphere_center = vector(trial["palm_position_world"]) + trial["reach_offset_m"]*unit(trial["palm_normal_world"])
     reach = any(sphere_intersects(b, sphere_center, trial["reach_radius_m"]) for b in delivered)
@@ -117,7 +133,7 @@ def evaluate(trial, physics_contacts=None):
             "total_time_s": (trial["planning"]["time_s"]+(len(executed)-1)*trial["dt_s"]) if "planning" in trial else None,
             "scope": trial.get("provenance", "Procedural geometry and UR5e joint replay; not original paper trials"),
             "source_data": trial.get("source_data"), "annotation_status": trial.get("annotation_status"),
-            "plan_scope": plan_scope}
+            "plan_scope": plan_scope, "replay_reference": trial.get("replay_reference")}
 
 
 def summarize(results):

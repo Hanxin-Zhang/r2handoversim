@@ -10,6 +10,14 @@ from .results import save_results
 def main(argv=None):
     parser = argparse.ArgumentParser(description="R2HandoverSim: Isaac Sim replay demos and offline evaluation")
     sub = parser.add_subparsers(dest="command", required=True)
+    paper = sub.add_parser("paper-replay", help="Export and verify Table I replay records")
+    paper.add_argument("--output", type=Path, default=Path("outputs/paper_replay"))
+    paper.add_argument("--seed", type=int, default=0)
+    recorded = sub.add_parser("replay-trial", help="Convert a paper replay ID to an Isaac Sim trial")
+    recorded.add_argument("--record", required=True)
+    recorded.add_argument("--records", type=Path, help="Default: bundled paper replay records")
+    recorded.add_argument("--dataset", type=Path, help="Optional local method dataset manifest")
+    recorded.add_argument("--output", type=Path, default=Path("outputs/replay_trial.json"))
     pipeline = sub.add_parser("from-pipeline", help="Convert a completed one-command method run")
     pipeline.add_argument("--pipeline", type=Path, required=True)
     pipeline.add_argument("--seed", type=int, default=0)
@@ -35,6 +43,7 @@ def main(argv=None):
             p.add_argument("--video", action="store_true", help="Record actual viewport frames to MP4 (requires ffmpeg)")
             p.add_argument("--video-speed", type=float, default=1., help="Playback speed; 0.25 gives quarter-speed review")
             p.add_argument("--camera", choices=["overview", "handover"], default="overview")
+            p.add_argument("--asset-config", type=Path, help="Local UR5e/Robotiq USD and object mesh configuration")
             p.add_argument("--hand-collision", choices=["boxes", "mesh"], default="boxes",
                            help="Use supplied hand triangles for PhysX safety instead of boxes")
     convert = sub.add_parser("from-intent", help="Convert method scene + selection to a demo joint-replay trial")
@@ -53,6 +62,21 @@ def main(argv=None):
     dataset.add_argument("--output", type=Path, default=Path("outputs/dataset_trials"))
     args = parser.parse_args(argv)
     try:
+        if args.command == "paper-replay":
+            from .paper_replay import export
+            audit = export(args.output, args.seed)
+            print(f"Replay: {audit['records']} records, {audit['checked_table_cells']} Table I cells verified: {args.output.resolve()}")
+            return
+        if args.command == "replay-trial":
+            from .paper_replay import read_records, materialize
+            record = next((r for r in read_records(args.records) if r['id'] == args.record), None)
+            if record is None: raise ValueError(f"Unknown replay record: {args.record}")
+            trial = materialize(record, args.dataset)
+            validate_trial(trial)
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(json.dumps(trial, allow_nan=False))
+            print(args.output.resolve())
+            return
         if args.command == "from-pipeline":
             from .workflows import from_pipeline
             trial = from_pipeline(args.pipeline, args.seed)
@@ -125,6 +149,9 @@ def main(argv=None):
         args.output.mkdir(parents=True, exist_ok=True)
         if args.command == "demo":
             from .runner import replay
+            if args.asset_config:
+                from .local_assets import configuration, attach
+                trials = attach(trials, configuration(args.asset_config))
             results = replay(trials, args.output, args.headless, args.hold, args.render_every, args.screenshot, args.animation,
                              hand_collision=args.hand_collision, video=args.video, video_speed=args.video_speed, camera=args.camera)
         else:

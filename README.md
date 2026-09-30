@@ -2,13 +2,13 @@
 
 **Isaac Sim handover demos with offline method outputs and reproducible result files.**
 
-This release contains three objects (hammer, screwdriver, bottle) and
+The dependency-free fixtures contain three objects (hammer, screwdriver, bottle) and
 four illustrative joint-trajectory variants. Isaac Sim renders the scene,
 advances the simulation, and queries PhysX for robot/hand overlap at each frame.
 No baseline model, ROS, MoveIt, external USD asset server, or MANO download is
 needed to run the examples.
 
-The robot uses nominal UR5e DH kinematics with **procedural link/parallel-gripper
+The default fixtures use nominal UR5e DH kinematics with **procedural link/parallel-gripper
 proxies**, an 85 mm aperture, and a fixed receiving-hand proxy. The bundled examples
 replay supplied joint trajectories; an optional planner can generate new paths
 for independently supplied handover targets. They do not reproduce the paper's complete
@@ -75,6 +75,56 @@ runs produce a nonzero CLI exit code instead of being mistaken for success.
 `run.json` records the run status. Screenshot capture has a 60-second timeout.
 
 ![Isaac Sim demo](docs/isaac_demo.png)
+
+## Local UR5e / Robotiq and object meshes
+
+Use the original UR5e + Robotiq 2F-85 USD assembly and the 16 configured object
+OBJ meshes with an explicit local asset configuration:
+
+```bash
+python -m pip install -e '.[assets]'
+mkdir -p outputs
+cp configs/local_assets.example.json outputs/local_assets.json
+# Set robot_usd and object_mesh_root in that file.
+r2handoversim demo --trial trial.json --asset-config outputs/local_assets.json \
+  --headless --video --screenshot --animation --output outputs/asset_replay
+```
+
+The adapter uses the `danilab_ur5e` assembly's six UR5e joint names and Robotiq
+finger links, including its joint-frame transforms, original meshes, materials,
+and collision shapes. The example placement aligns this assembly with the
+release's nominal UR5e base. Object names must match the OBJ filenames;
+`object_aliases` handles `hammer` → `hammers`. Mesh vertices use meters in the
+same object frame as the configured point cloud. Source paths and hashes are
+recorded in results. Assets remain local and are not redistributed.
+
+The original gripper tool frame is calibrated from its finger pads. Playback
+moves the USD links kinematically and attaches the object rigidly. PhysX Safe
+checks use the USD robot colliders; Plan/Reach/Affordance retain the documented
+geometric predicates. Existing proxy-tool planning metadata is not presented
+as a new plan for the calibrated tool. MP4 and time-sampled USD exports use the
+same joint trajectory. A decoded MANO mesh from the method pipeline is supported
+with `--hand-collision mesh`.
+
+![Original UR5e, Robotiq and object mesh](docs/isaac_asset_replay.png)
+
+## Paper replay
+
+```bash
+r2handoversim paper-replay --output outputs/paper_replay
+r2handoversim replay-trial --record S1_m4_0000 \
+  --dataset /path/to/intent-handover/outputs/dataset/dataset.json --output trial.json
+# Replay with the local USD/OBJ configuration above.
+```
+
+Includes 8,000 **reconstructed replay** records, four baseline settings, 16
+object IDs, and S0/S1/Avg summaries matching Table I's 108 reported cells.
+Records contain joint keyframes, timings, setting IDs, and reference outcomes.
+The replay population and object split are documented reconstruction choices.
+`reference.json` contains source settings and coverage; `verification.json`
+checks the reconstructed aggregate. Simulator results are evaluated separately
+and can differ from assigned reference outcomes. Real-robot tables and user
+questionnaires are excluded.
 
 ## Demo variants
 

@@ -1,14 +1,13 @@
 """Isaac Sim 5.0 standalone replay and PhysX hand-overlap evaluation.
 
-Imports of Kit/USD happen only after SimulationApp starts. Scene assets are
-created from primitives, avoiding external asset downloads and absolute paths.
+Imports of Kit/USD happen only after SimulationApp starts. Scenes support bundled primitives and explicitly configured local USD/OBJ assets.
 """
 import time
 import json
 from pathlib import Path
 import numpy as np
-from .evaluation import evaluate, robot_geometry, validate_trial
-from .geometry import box, box_pose, inverse, moved, transform
+from .evaluation import evaluate, robot_geometry, validate_trial, trial_tcp
+from .geometry import box, box_pose, inverse, moved, transform, projected_width, points
 from .robot import tcp
 from .results import save_results
 
@@ -41,7 +40,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
     try:
         from isaacsim.core.api import World
         from isaacsim.core.utils.viewports import set_camera_view
-        from pxr import Gf, UsdGeom, UsdLux, UsdPhysics
+        from pxr import Gf, UsdGeom, UsdLux, UsdPhysics, PhysicsSchemaTools
         from omni.physx import get_physx_scene_query_interface
         import carb
         world = World(stage_units_in_meters=1., physics_dt=1/60, rendering_dt=1/60)
@@ -101,10 +100,38 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
         draw_box("/World/Table", box([-.35, 0, .70], [.65, .55, .035]), [.24, .29, .36], collider=True)
         save_run("running")
         for trial in trials:
+            from copy import deepcopy
+            trial = deepcopy(trial)
             world.stop()
             if stage.GetPrimAtPath("/World/Trial"):
                 stage.RemovePrim("/World/Trial")
             UsdGeom.Xform.Define(stage, "/World/Trial")
+            for group in ("Robot", "Object", "Hand"):
+                UsdGeom.Xform.Define(stage, f"/World/Trial/{group}")
+            if stage.GetPrimAtPath('/World/AssetRobot'): stage.RemovePrim('/World/AssetRobot')
+            asset_robot = None
+            if 'asset_robot' in trial:
+                from .usd_robot import UsdRobot
+                config = trial['asset_robot']
+                asset_robot = UsdRobot(stage, config['usd'], config['translation'])
+                opening = min(projected_width(trial['object_boxes'], transform(trial['T_object_gripper'])[:3,1]), .085)
+                asset_robot.update(trial['planned_joints'][-1], opening)
+                old_goal = tcp(trial['planned_joints'][-1])
+                tool_offset = inverse(old_goal) @ asset_robot.tool_pose()
+                shift = old_goal @ tool_offset @ inverse(old_goal)
+                trial['T_tcp_asset_tool'] = tool_offset.tolist()
+                trial['target_T_world_gripper'] = (transform(trial['target_T_world_gripper'])@tool_offset).tolist()
+                trial['hand_boxes_world'] = [moved(b, shift) for b in trial['hand_boxes_world']]
+                trial['palm_position_world'] = points(shift, trial['palm_position_world']).tolist()
+                trial['palm_normal_world'] = (shift[:3,:3]@trial['palm_normal_world']).tolist()
+                if 'hand_mesh_world' in trial:
+                    trial['hand_mesh_world']['vertices'] = points(shift, trial['hand_mesh_world']['vertices']).tolist()
+                # Existing planner checks describe the old proxy tool frame.
+                if 'planning' in trial:
+                    trial['pre_asset_planning'] = trial.pop('planning')
+                UsdGeom.Imageable(stage.GetPrimAtPath('/World/Table')).MakeInvisible()
+            else:
+                UsdGeom.Imageable(stage.GetPrimAtPath('/World/Table')).MakeVisible()
             if camera == "handover":
                 target = np.asarray(trial["palm_position_world"])
                 set_camera_view(eye=target+np.array([.48, -.65, .38]), target=target)
@@ -150,11 +177,25 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
             q0 = trial["executed_joints"][0]
             robot_ops = [draw_box(f"/World/Trial/Robot/part_{i}", b, [.35, .6, .9])
                          for i, b in enumerate(robot_geometry(trial, q0))]
+            if asset_robot:
+                UsdGeom.Imageable(stage.GetPrimAtPath('/World/Trial/Robot')).MakeInvisible()
             grasp_inverse = inverse(trial["T_object_gripper"])
-            object_ops = [draw_box(f"/World/Trial/Object/part_{i}", moved(b, tcp(q0) @ grasp_inverse), [.2, .85, .65])
+            object_ops = [draw_box(f"/World/Trial/Object/part_{i}", moved(b, trial_tcp(trial, q0) @ grasp_inverse), [.2, .85, .65])
                           for i, b in enumerate(trial["object_boxes"])]
             point_op = None
-            if "object_points_object" in trial:
+            if "object_mesh_object" in trial:
+                UsdGeom.Imageable(stage.GetPrimAtPath('/World/Trial/Object')).MakeInvisible()
+                data = trial['object_mesh_object']
+                mesh = UsdGeom.Mesh.Define(stage, '/World/Trial/ObjectMesh')
+                mesh.CreatePointsAttr([Gf.Vec3f(*p) for p in data['vertices']])
+                mesh.CreateFaceVertexCountsAttr([3]*len(data['faces']))
+                mesh.CreateFaceVertexIndicesAttr(np.asarray(data['faces']).reshape(-1).tolist())
+                mesh.CreateSubdivisionSchemeAttr('none')
+                mesh.CreateDisplayColorAttr([Gf.Vec3f(*c) for c in data['colors']])
+                mesh.GetDisplayColorPrimvar().SetInterpolation('vertex')
+                point_op = UsdGeom.Xformable(mesh.GetPrim()).AddTransformOp()
+                point_op.Set(Gf.Matrix4d(*(trial_tcp(trial,q0)@grasp_inverse).T.reshape(-1).tolist()))
+            elif "object_points_object" in trial:
                 for i in range(len(object_ops)):
                     UsdGeom.Imageable(stage.GetPrimAtPath(f"/World/Trial/Object/part_{i}")).MakeInvisible()
                 cloud = UsdGeom.Points.Define(stage, "/World/Trial/ObjectCloud")
@@ -162,7 +203,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 cloud.CreateWidthsAttr([.0015]*len(trial["object_points_object"]))
                 cloud.CreateDisplayColorAttr([Gf.Vec3f(.2, .85, .65)])
                 point_op = UsdGeom.Xformable(cloud.GetPrim()).AddTransformOp()
-                point_op.Set(Gf.Matrix4d(*(tcp(q0)@grasp_inverse).T.reshape(-1).tolist()))
+                point_op.Set(Gf.Matrix4d(*(trial_tcp(trial,q0)@grasp_inverse).T.reshape(-1).tolist()))
             center = np.asarray(trial["palm_position_world"]) + trial["reach_offset_m"] * np.asarray(trial["palm_normal_world"])/np.linalg.norm(trial["palm_normal_world"])
             for axis in range(3):
                 circle = UsdGeom.BasisCurves.Define(stage, f"/World/Trial/ReachRegion/ring_{axis}")
@@ -180,6 +221,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 circle.SetWidthsInterpolation("constant")
                 circle.CreateDisplayColorAttr([Gf.Vec3f(.15, .8, .3)])
             world.reset()
+            if asset_robot: asset_robot.update(q0, opening)
             world.step(render=True)
             if video or screenshot:
                 for _ in range(8):
@@ -191,12 +233,13 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 if not app.is_running():
                     raise RuntimeError("Isaac Sim closed before replay finished")
                 robot_boxes = robot_geometry(trial, q)
+                if asset_robot: asset_robot.update(q, opening)
                 for op, b in zip(robot_ops, robot_boxes):
                     update_box(op, b)
                 for op, b in zip(object_ops, trial["object_boxes"]):
-                    update_box(op, moved(b, tcp(q) @ grasp_inverse))
+                    update_box(op, moved(b, trial_tcp(trial,q) @ grasp_inverse))
                 if point_op is not None:
-                    point_op.Set(Gf.Matrix4d(*(tcp(q)@grasp_inverse).T.reshape(-1).tolist()))
+                    point_op.Set(Gf.Matrix4d(*(trial_tcp(trial,q)@grasp_inverse).T.reshape(-1).tolist()))
                 world.step(render=video or frame % render_every == 0)
                 hit_hand = [False]
 
@@ -205,18 +248,28 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                         hit_hand[0] = True
                     return True
 
-                for b in robot_boxes:
-                    query.overlap_box(carb.Float3(*b["half_extents"]), carb.Float3(*b["center"]),
-                                      quaternion(b["rotation"]), report_hit, False)
+                if asset_robot:
+                    for path in asset_robot.colliders:
+                        a,b=PhysicsSchemaTools.encodeSdfPath(path)
+                        query.overlap_shape(a,b,report_hit,False)
+                else:
+                    for b in robot_boxes:
+                        query.overlap_box(carb.Float3(*b["half_extents"]), carb.Float3(*b["center"]),
+                                          quaternion(b["rotation"]), report_hit, False)
                 contacts.append(hit_hand[0])
                 if video:
                     capture_file(frame_directory / f"{frame:06d}.png")
             result = evaluate(trial, contacts)
             result["safe_source"] = f"Isaac Sim PhysX robot-box overlap against static hand {hand_collision} at every frame"
+            if asset_robot:
+                result['safe_source'] = f'Isaac Sim PhysX actual USD robot collider overlap against hand {hand_collision}'
+                result['asset_robot'] = {**trial['asset_robot'], 'mesh_count':asset_robot.mesh_count,
+                                        'collider_count':len(asset_robot.colliders), 'T_tcp_asset_tool':trial['T_tcp_asset_tool']}
+                result['object_asset'] = {k:trial['object_mesh_object'][k] for k in ('source_path','source_sha256')}
             result["hand_collision"] = hand_collision
             result["execution_wall_time_s"] = time.perf_counter() - started
             result["backend"] = "isaacsim-physx"
-            result["physics_scope"] = "Static hand colliders and robot-box overlap queries; object rigidly replayed; no grasp dynamics"
+            result["physics_scope"] = "Static hand colliders and " + ("USD robot collider" if asset_robot else "robot-box") + " overlap queries; kinematic robot and rigidly attached object; no grasp dynamics"
             results.append(result)
             # Some Kit installations terminate Python during app.close(). Persist first.
             save_results(results, output)
@@ -242,7 +295,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 result["artifacts"]["screenshot"] = f"{trial['id']}.png"
             if animation:
                 from .animation import bake
-                bake(snapshot, output / f"{trial['id']}_animation.usda", trial)
+                bake(snapshot, output / f"{trial['id']}_animation.usda", trial, asset_robot=asset_robot, opening=opening if asset_robot else None)
                 result["artifacts"]["animation"] = f"{trial['id']}_animation.usda"
             print(f"{trial['id']}: {result['first_failure'] or 'success'} (Isaac Sim)", flush=True)
         save_results(results, output)

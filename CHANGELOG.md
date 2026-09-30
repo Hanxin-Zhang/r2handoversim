@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0
+
+- Add configurable original UR5e/Robotiq USD and local OBJ meshes, calibrated tool frames, actual robot collider queries, and USD/MP4 replay exports.
+- Add 8,000 deterministic reconstructed Table I replay records, source settings, exact aggregate verification and independent simulator evaluation.
+
 ## 0.6.0
 
 - Record actual Isaac Sim viewport frames to H.264 MP4 with configurable playback

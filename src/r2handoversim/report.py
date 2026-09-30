@@ -29,6 +29,8 @@ def write_report(results, output):
 body{background:#111b2d;color:#e9f0ff;font:15px system-ui;margin:40px auto;max-width:1320px;padding:0 24px}h1{font-size:30px}p{color:#b8c8df;line-height:1.7}.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:12px;border-bottom:1px solid #35445b;white-space:nowrap}.pass{color:#68dfb5}.fail{color:#ff9292}.na{color:#91a0b8}a{color:#84b8ff}
 </style><h1>R2HandoverSim / results</h1>'''
     document += f'<p>{len(results)} trials · {count} successful · {len(results)-count} failed</p>'
+    if any(r.get("replay_reference") for r in results):
+        document += '<p>Reconstructed paper replay. Metrics below are evaluated from these scenes; assigned reference outcomes remain in results.json.</p>'
     document += '<p>Safety source: ' + html.escape('; '.join(sorted({r.get("safe_source", "unspecified") for r in results}))) + '</p>'
     document += '<div class="scroll"><table><tr><th>Trial</th><th>Split</th>' + ''.join(f'<th>{m.title()}</th>' for m in metrics) + '<th>First failure</th><th>Artifacts</th></tr>' + ''.join(rows) + '</table></div>'
     document += '<p>Release demo results, not paper measurements. Plan checks a provided joint path; Safe uses sampled overlap. S0 omits Affordance. First failure: Stability → Plan → Reach → Affordance → Safe.</p><p><a href="results.json">JSON</a> · <a href="results.csv">CSV</a> · <a href="summary.json">Summary</a></p></html>'

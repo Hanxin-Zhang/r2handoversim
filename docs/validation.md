@@ -123,3 +123,14 @@ continuous collision detection or the original paper's numeric results.
   produces exactly 15 PhysX hand-contact frames. Capture overhead is included
   only in simulator wall time, not trajectory duration.
 - Generated MANO-derived videos remain local review artifacts, outside Git.
+
+## Original-asset replay (0.7.0)
+
+Validated locally with Isaac Sim 5.0.0 on RTX 4070:
+
+- Original `danilab_ur5e` USD: 36 mesh prims, 16 robot collider prims, UR5e six-joint motion and Robotiq 2F-85 fingers.
+- All 16 configured OBJ objects loaded and completed viewport MP4, screenshot, and time-sampled USD export. This is an asset/replay smoke check, not a paper success-rate experiment.
+- A Text2HOI-predicted MANO hand and original binocular mesh replayed with triangle-mesh hand collision.
+- Six authored reference-outcome examples (success, Plan, Reach, Safe, Stability, Affordance) were retargeted for the original tool and table clearance. Independent simulator predicates matched all six; the Safe example had six detected contact frames.
+- 8,000 bundled reconstructed records match 108 Table I cells. Wheel resource loading and deterministic regeneration checked. These aggregate checks concern reference records, separately from the six simulator examples.
+- 35 CPU tests pass. Optional local assets are not part of CI or redistributed in the wheel.
