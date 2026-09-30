@@ -1,4 +1,4 @@
-name: CPU tests
+name: Release checks
 on: [push, pull_request]
 jobs:
   test:
@@ -11,6 +11,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - run: python -m pip install '.[planning]'
+      - run: python -m pip install build twine
+      - run: python -m build
+      - run: python -m twine check dist/*
+      - name: Install only the built wheel
+        run: python -m pip install "$(find dist -name '*.whl')[planning,assets]"
       - run: python -m unittest discover -s tests -v
-      - run: python -m r2handoversim evaluate --object all --variant all
+      - name: Exercise installed package outside the checkout
+        run: cd /tmp && python "$GITHUB_WORKSPACE/scripts/release_smoke.py"
+      - name: Rebuild the source archive
+        run: |
+          mkdir /tmp/r2-source
+          tar -xzf dist/*.tar.gz -C /tmp/r2-source --strip-components=1
+          cd /tmp/r2-source
+          python -m build --wheel
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r2handoversim-python-${{ matrix.python }}
+          path: dist/*

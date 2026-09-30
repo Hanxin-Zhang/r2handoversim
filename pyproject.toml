@@ -1,15 +1,16 @@
 [build-system]
-requires = ["setuptools>=64"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "r2handoversim"
-version = "0.8.0"
+version = "0.9.0"
 description = "Isaac Sim robot-to-human handover replay demos and evaluation"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["numpy>=1.23"]
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE", "THIRD_PARTY.md"]
 
 [project.optional-dependencies]
 planning = ["scipy>=1.10"]

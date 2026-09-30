@@ -153,3 +153,39 @@ This remains geometric contact replay, not a frictional holding-force test.
 - A real-asset binocular/MANO replay was exported and reloaded in Isaac Sim. All 90 timestamps, joint states, tool/object poses and PhysX contact observations agreed to an absolute tolerance of 1e-10.
 - The six authored outcome examples were replayed again. All exported NPZ contact frames and durations agree with the JSON results, and all six reference outcomes match the evaluated outcomes.
 - Resolved JSON embeds the scene actually used, including calibration and receiver retargeting. The NPZ stores numeric frame observations without pickle objects. This validation concerns kinematic replay, not a new paper experiment or frictional grasp test.
+
+## Public release checks (0.9.0)
+
+- 51 CPU tests pass, including the standalone local-mesh generator, missing
+  environment/encoder checks, malformed CLI input, calibrated-tool planning,
+  and detection of inconsistent exported collision observations.
+- A fresh Python 3.10 virtual environment installed only the built wheel with
+  planning/assets extras (NumPy 2.2.6, SciPy 1.15.3, trimesh 5.1.0, Pillow
+  12.3.0). The tests and installed-package smoke passed. All 12 offline fixtures,
+  8,000 replay records / 108 reference cells, and record materialization ran
+  outside source-package imports. Wheel/source metadata checks passed, and the
+  source archive rebuilt a wheel independently.
+- The wheel installed into a separate directory ran all 12 default Isaac Sim
+  fixtures from `/tmp`; metrics, first failures and contact-frame counts matched
+  the stored regression results. Screenshots, animations and numeric trajectory
+  exports were produced and cross-checked.
+- The new `from-assets` command generated all 16 local OBJ demos without reading
+  the method repository. All 16 completed original UR5e/Robotiq replay and video,
+  image, USD animation and JSON/NPZ export: 1,440 frames and 96 output artifacts.
+  Maximum bilateral pad-surface distance was 0.001651 mm (threshold 0.2 mm).
+  Maximum observed-tool versus model position difference was 3.06e-8 m.
+- A 90-frame resolved bottle scene reloaded without refitting; timestamps,
+  joints, tool/object poses, grasp and contact observations agree to 1e-10.
+  The final wheel also replayed and recorded that real-asset scene independently.
+- `verify-output` passed for the 16-object run, 12 default fixtures, six authored
+  reference outcomes and the existing 90-frame MANO/binocular scene. The six
+  outcome examples retain separate assigned reference and evaluated labels.
+- Source archives include the configuration template, launcher, tests and docs;
+  release archives exclude local robot USDs, original OBJ/PLY assets, weights,
+  MANO models and generated private output directories. CI repeats the package
+  build/install/smoke checks across Python 3.10–3.12.
+
+These are release functionality checks. The 16 generated scenes use authored
+hand proxies and geometric approaches, not original baseline predictions or
+paper success-rate experiments. The 73-second review montage contains actual
+Isaac Sim viewport captures with object/setting/outcome labels.

@@ -40,6 +40,8 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
         require_encoder()
     for trial in trials:
         validate_trial(trial)
+        if 'asset_robot' in trial and not Path(trial['asset_robot']['usd']).is_file():
+            raise ValueError(f"Missing local robot USD: {trial['asset_robot']['usd']}")
         if hand_collision == "mesh" and "hand_mesh_world" not in trial:
             raise ValueError("Mesh collision requires hand_mesh_world in every trial")
     if hand_collision not in ("boxes", "mesh"):

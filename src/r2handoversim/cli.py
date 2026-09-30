@@ -9,7 +9,20 @@ from .results import save_results
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="R2HandoverSim: Isaac Sim replay demos and offline evaluation")
+    from . import __version__
+    parser.add_argument('--version', action='version', version=f'r2handoversim {__version__}')
     sub = parser.add_subparsers(dest="command", required=True)
+    doctor = sub.add_parser('doctor', help='Check this Python environment and optional assets without starting Kit')
+    doctor.add_argument('--isaac', action='store_true', help='Require Isaac Sim to be installed')
+    doctor.add_argument('--video', action='store_true', help='Require an H.264 ffmpeg encoder')
+    doctor.add_argument('--asset-config', type=Path)
+    doctor.add_argument('--output', type=Path, help='Save a machine-readable JSON check report')
+    assets = sub.add_parser('from-assets', help='Generate standalone geometry demos from local OBJ meshes')
+    assets.add_argument('--asset-config', type=Path, required=True)
+    assets.add_argument('--objects', nargs='+', help='Object IDs; default: all OBJ filenames in the configured directory')
+    assets.add_argument('--output', type=Path, default=Path('outputs/local_trials'))
+    verify = sub.add_parser('verify-output', help='Cross-check a completed simulator run and its numeric trajectory records')
+    verify.add_argument('--input', type=Path, required=True, help='Directory containing run.json and results.json')
     paper = sub.add_parser("paper-replay", help="Export and verify Table I replay records")
     paper.add_argument("--output", type=Path, default=Path("outputs/paper_replay"))
     paper.add_argument("--seed", type=int, default=0)
@@ -62,6 +75,26 @@ def main(argv=None):
     dataset.add_argument("--output", type=Path, default=Path("outputs/dataset_trials"))
     args = parser.parse_args(argv)
     try:
+        if args.command == 'verify-output':
+            from .verification import verify_output
+            report = verify_output(args.input)
+            print(f"Verified {report['trials']} trials / {report['frames']} frames: {args.input.resolve()}")
+            return
+        if args.command == 'doctor':
+            from .doctor import inspect_environment
+            report = inspect_environment(args.isaac, args.video, args.asset_config)
+            if args.output:
+                args.output.parent.mkdir(parents=True, exist_ok=True)
+                args.output.write_text(json.dumps(report, indent=2))
+            for check in report['checks']:
+                print(f"[{check['status']}] {check['name']}: {check['detail']}")
+            if report['status'] == 'failed': parser.exit(2, 'Required checks failed. See the actions above.\n')
+            return
+        if args.command == 'from-assets':
+            from .asset_demos import generate
+            trials = generate(args.asset_config, args.output, args.objects)
+            print(f"Generated {len(trials)} local mesh demos: {(args.output/'trials.json').resolve()}")
+            return
         if args.command == "paper-replay":
             from .paper_replay import export
             audit = export(args.output, args.seed)
@@ -126,6 +159,7 @@ def main(argv=None):
             if args.command == "plan" or args.delivery:
                 from .planning import plan_trial
                 trial = plan_trial(trial, seed=args.seed, iterations=getattr(args, "iterations", 600))
+            validate_trial(trial)
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(json.dumps(trial, indent=2, allow_nan=False))
             print(args.output.resolve())
@@ -139,13 +173,13 @@ def main(argv=None):
                    for v in (VARIANTS if args.variant == "all" else [args.variant])])
         if not isinstance(trials, list) or not trials:
             raise ValueError("Expected a nonempty JSON trial array")
-        if len({trial['id'] for trial in trials}) != len(trials):
-            raise ValueError("Duplicate trial ids are not allowed in a batch")
         for trial in trials:
             validate_trial(trial)
             import re
             if not re.fullmatch(r"[a-zA-Z0-9_-]+", trial["id"]):
                 raise ValueError("Trial id must contain only letters, digits, underscores and hyphens")
+        if len({trial['id'] for trial in trials}) != len(trials):
+            raise ValueError("Duplicate trial ids are not allowed in a batch")
         args.output.mkdir(parents=True, exist_ok=True)
         if args.command == "demo":
             from .runner import replay
@@ -160,5 +194,5 @@ def main(argv=None):
                 print(f"{result['trial_id']}: {result['first_failure'] or 'success'} (offline geometry)")
         save_results(results, args.output)
         print(f"Results: {args.output.resolve()}")
-    except (ValueError, KeyError, OSError, ImportError, RuntimeError) as exc:
+    except (ValueError, KeyError, TypeError, AttributeError, OSError, ImportError, RuntimeError) as exc:
         parser.exit(2, f"Error: {exc}\n")

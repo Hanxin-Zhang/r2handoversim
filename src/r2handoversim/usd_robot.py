@@ -4,8 +4,11 @@ import numpy as np
 
 class UsdRobot:
     def __init__(self, stage, usd_path, translation):
-        from pxr import Usd, UsdGeom, UsdPhysics, Gf
+        from pxr import Usd, UsdGeom, UsdPhysics, Gf, Sdf, UsdUtils
         self.stage, self.Gf, self.UsdGeom = stage, Gf, UsdGeom
+        _, _, unresolved = UsdUtils.ComputeAllDependencies(Sdf.AssetPath(str(usd_path)))
+        if unresolved:
+            raise ValueError(f'Robot USD has unresolved asset dependencies: {unresolved[0]}')
         self.root = stage.DefinePrim('/World/AssetRobot', 'Xform')
         self.root.GetReferences().AddReference(str(usd_path))
         xform=UsdGeom.Xformable(self.root);xform.ClearXformOpOrder()
@@ -13,6 +16,10 @@ class UsdRobot:
         for _ in range(3):
             for prim in list(Usd.PrimRange(self.root)):
                 if prim.IsInstance(): prim.SetInstanceable(False)
+        required = ['ur5e_wrist_3_link', 'robotiq_85_left_finger_tip_link', 'robotiq_85_right_finger_tip_link']
+        missing = [name for name in required if not stage.GetPrimAtPath('/World/AssetRobot/'+name)]
+        if missing:
+            raise ValueError('Expected danilab_ur5e UR5e/Robotiq assembly; missing links: '+', '.join(missing))
         self.joints = []
         for prim in list(Usd.PrimRange(self.root)):
             if prim.IsA(UsdPhysics.Joint):
@@ -31,6 +38,11 @@ class UsdRobot:
                 UsdPhysics.RigidBodyAPI(prim).GetRigidBodyEnabledAttr().Set(False)
             if prim.HasAPI(UsdPhysics.ArticulationRootAPI): prim.RemoveAPI(UsdPhysics.ArticulationRootAPI)
         self.ops = {}
+        required_joints = {'ur5e_'+name+'_joint' for name in
+                           ('shoulder_pan', 'shoulder_lift', 'elbow', 'wrist_1', 'wrist_2', 'wrist_3')}
+        missing = required_joints - {joint[0] for joint in self.joints}
+        if missing:
+            raise ValueError('Robot USD is missing required arm joints: '+', '.join(sorted(missing)))
         for _, _, child, *_ in self.joints:
             p = stage.GetPrimAtPath(child)
             x = UsdGeom.Xformable(p); x.ClearXformOpOrder()
@@ -40,6 +52,9 @@ class UsdRobot:
         self.mesh_count = sum(p.IsA(UsdGeom.Mesh) for p in Usd.PrimRange(self.root))
         if not self.mesh_count or len(self.joints) < 6:
             raise ValueError('Robot USD has no accessible meshes or six arm joints')
+        for side in ('left', 'right'):
+            if not any(f'/robotiq_85_{side}_finger_tip_link/' in str(p) for p in self.colliders):
+                raise ValueError(f'Robot USD is missing the {side} finger pad collider')
 
     def world_matrix(self, path):
         return np.array(self.UsdGeom.Xformable(self.stage.GetPrimAtPath(path)).ComputeLocalToWorldTransform(0)).T

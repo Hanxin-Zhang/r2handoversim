@@ -8,12 +8,21 @@ import numpy as np
 
 def configuration(path):
     path=Path(path).resolve();data=json.loads(path.read_text())
-    if data.get('schema_version')!='handover.local_assets.v1': raise ValueError('Expected handover.local_assets.v1')
+    if not isinstance(data, dict) or data.get('schema_version')!='handover.local_assets.v1':
+        raise ValueError('Expected handover.local_assets.v1')
     for key in ['robot_usd','object_mesh_root']:
         target=Path(data[key]);target=target if target.is_absolute() else path.parent/target
         target=target.resolve()
         if not target.exists(): raise ValueError(f'Missing local asset: {target}')
         data[key]=str(target)
+    if not Path(data['robot_usd']).is_file(): raise ValueError('robot_usd must be a file')
+    if not Path(data['object_mesh_root']).is_dir(): raise ValueError('object_mesh_root must be a directory')
+    translation = np.asarray(data.get('robot_translation', [-.5625, -.36, -.02]), dtype=float)
+    if translation.shape != (3,) or not np.isfinite(translation).all():
+        raise ValueError('robot_translation must contain three finite meter coordinates')
+    aliases = data.get('object_aliases', {})
+    if not isinstance(aliases, dict) or not all(isinstance(k, str) and isinstance(v, str) for k,v in aliases.items()):
+        raise ValueError('object_aliases must map string object IDs to string mesh names')
     return data
 
 

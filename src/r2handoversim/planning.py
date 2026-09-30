@@ -7,7 +7,7 @@ from copy import deepcopy
 import time
 import numpy as np
 from .geometry import box, intersects, inverse, moved, transform
-from .evaluation import robot_geometry, validate_trial
+from .evaluation import robot_geometry, validate_trial, trial_tcp
 from .robot import HOME, joints, tcp
 
 
@@ -42,7 +42,7 @@ def configuration_clear(trial, q):
     if np.any(np.abs(joints(q)) > 2*np.pi):
         return False
     robot = robot_geometry(trial, q)
-    attached = [moved(b, tcp(q)@inverse(trial["T_object_gripper"])) for b in trial["object_boxes"]]
+    attached = [moved(b, trial_tcp(trial, q)@inverse(trial["T_object_gripper"])) for b in trial["object_boxes"]]
     obstacles = trial.get("obstacle_boxes_world", [])
     hand = trial["hand_boxes_world"]
     if any(_overlap(a, b) for a in robot+attached for b in hand+obstacles):
@@ -120,7 +120,8 @@ def plan_trial(trial, seed=0, iterations=600, max_joint_speed=.6, resolution=.06
     result.setdefault("obstacle_boxes_world", [box([-.35, 0, .70], [.65, .55, .035], label="table")])
     started = time.perf_counter()
     start = joints(trial["planned_joints"][0])
-    candidates = solve_pose(trial["target_T_world_gripper"], start, seed=seed)
+    offset = transform(trial.get("T_tcp_asset_tool", np.eye(4)))
+    candidates = solve_pose(transform(trial["target_T_world_gripper"]) @ inverse(offset), start, seed=seed)
     rng, path = np.random.default_rng(seed), None
     for goal in candidates:
         path = rrt_connect(start, goal, lambda q: configuration_clear(result, q), rng,

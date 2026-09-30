@@ -2,7 +2,7 @@
 
 **Isaac Sim handover demos with offline method outputs and reproducible result files.**
 
-The dependency-free fixtures contain three objects (hammer, screwdriver, bottle) and
+The bundled fixtures contain three objects (hammer, screwdriver, bottle) and
 four illustrative joint-trajectory variants. Isaac Sim renders the scene,
 advances the simulation, and queries PhysX for robot/hand overlap at each frame.
 No baseline model, ROS, MoveIt, external USD asset server, or MANO download is
@@ -25,8 +25,8 @@ environment:
 ```bash
 git clone https://github.com/Hanxin-Zhang/r2handoversim.git
 cd r2handoversim
-python -m pip install --upgrade pip setuptools wheel
 python -m pip install -e .
+r2handoversim doctor --isaac
 r2handoversim demo --object hammer --hold
 ```
 
@@ -82,13 +82,24 @@ Use the original UR5e + Robotiq 2F-85 USD assembly and the 16 configured object
 OBJ meshes with an explicit local asset configuration:
 
 ```bash
-python -m pip install -e '.[assets]'
+python -m pip install -e '.[planning,assets]'
 mkdir -p outputs
 cp configs/local_assets.example.json outputs/local_assets.json
 # Set robot_usd and object_mesh_root in that file.
-r2handoversim demo --trial trial.json --asset-config outputs/local_assets.json \
-  --headless --video --screenshot --animation --output outputs/asset_replay
+r2handoversim doctor --isaac --video --asset-config outputs/local_assets.json
+r2handoversim from-assets --asset-config outputs/local_assets.json \
+  --objects bottle --output outputs/local_trials
+r2handoversim demo --trials outputs/local_trials/trials.json \
+  --headless --video --screenshot --animation --camera handover --output outputs/asset_replay
 ```
+
+Omit `--objects bottle` to generate demos for every OBJ in the configured folder.
+This workflow needs no method checkout, model weights or dataset manifest. It
+chooses a geometric approach, a static hand proxy and an authored 90-frame
+trajectory. Its S0 metrics use object bounding boxes. Failed fits stop with an
+error; outputs are replay examples, not baseline predictions. If you already
+have a method trial, pass `--trial trial.json --asset-config outputs/local_assets.json`
+directly to `demo` instead.
 
 The adapter uses the `danilab_ur5e` assembly's six UR5e joint names and Robotiq
 finger links, including its joint-frame transforms, original meshes, materials,
@@ -121,7 +132,7 @@ including the fitted grasp, calibrated tool offset and retargeted receiver.
 Load this file directly to repeat the same scene:
 
 ```bash
-r2handoversim demo --trial outputs/asset_replay/example_trial.json --headless \
+r2handoversim demo --trial outputs/asset_replay/bottle_local_mesh_trial.json --headless \
   --video --animation --output outputs/reloaded
 ```
 
@@ -138,6 +149,16 @@ For original-asset runs, tool poses are read from the USD at every frame and
 checked against the replay model. These are replay observations, separate from
 paper reference statistics. JSON/CSV/HTML show reference and evaluated outcomes
 separately, and retain right/left pad distances.
+
+To check a complete exported run without launching Isaac Sim again:
+
+```bash
+r2handoversim verify-output --input outputs/asset_replay
+```
+
+This checks completion counts, artifact presence, timestamps, joints, poses,
+collision observations and evaluated outcomes against the resolved scene.
+It does not turn replay observations into original paper measurements.
 
 Receiver retargeting also updates the skeleton, hand center, facing direction
 and delivery annotations. Its transform and the pre-calibration delivery/plan
@@ -187,7 +208,7 @@ recorded in the fixtures and result files.
 | Plan | Stored traces: joint limits, endpoint and sampled hand clearance. New planner: full pose IK plus RRT-Connect with robot/object/hand/obstacle box checks |
 | Reach | Delivered object boxes intersect the palm-normal sphere (12 cm offset, 10 cm radius) |
 | Affordance | Finger proxies do not intersect the intended region; omitted in S0 |
-| Safe | No hand overlap for robot/gripper boxes at replay frames, using Isaac Sim PhysX; optional triangle-mesh hand collider |
+| Safe | No hand overlap at replay frames: proxy boxes by default, original robot colliders with local assets; optional triangle-mesh hand collider |
 
 First-failure attribution follows **Stability → Plan → Reach → Affordance → Safe**.
 S0 excludes Affordance from success and reports it as null. Failure rates sum to
@@ -279,6 +300,17 @@ object. Geometry metrics still use explicit occupied-cell box proxies. This
 batch uses generated hand/grasp examples and S0 evaluation because the config
 does not supply original functional-region labels or the paper split. It is
 separate from the three synthetic objects. See [dataset protocol](docs/dataset.md).
+
+## Installation help and release checks
+
+`r2handoversim doctor --isaac --video --asset-config outputs/local_assets.json`
+checks dependencies, encoder availability and local mesh files before launching
+Kit. Omit optional flags for an offline-only installation. It does not start the
+GPU runtime; the documented `demo` smoke run verifies that separately.
+
+See [installation and troubleshooting](docs/installation.md),
+[release checklist](docs/release.md), [validation history](docs/validation.md),
+and [external software and asset terms](THIRD_PARTY.md).
 
 ## Sources
 

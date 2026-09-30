@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.0
+
+- Generate local-mesh demo batches without a method checkout, dataset manifest or weights.
+- Add environment/encoder/asset preflight checks and readable malformed-input errors.
+- Cross-check exported scene/trajectory/result consistency with `verify-output`.
+- Correct IK targets and attached-object collision checks for calibrated tool offsets.
+- Validate required USD links, joints, pad colliders and reference composition.
+- Verify wheel and source distributions from an independent environment; include installation guidance and external-asset terms.
+
+
 ## 0.8.0
 
 - Export resolved replay trials and per-frame tool/object poses, joint positions, timestamps and PhysX hand-overlap observations.

@@ -14,10 +14,22 @@ def trial_tcp(trial, q):
 
 
 def validate_trial(trial):
+    if not isinstance(trial, dict):
+        raise ValueError('Each trial must be a JSON object')
     if trial.get("schema_version") != "handover.trial.v1" or trial.get("units") != "m":
         raise ValueError("Expected handover.trial.v1 with units=m")
     if not isinstance(trial.get("id"), str) or not re.fullmatch(r"[a-zA-Z0-9_-]+", trial["id"]):
         raise ValueError("Trial id must contain only letters, digits, underscores and hyphens")
+    for field in ('object_id', 'variant'):
+        if not isinstance(trial.get(field), str) or not trial[field]:
+            raise ValueError(f'{field} must be a nonempty string')
+    if 'asset_robot' in trial:
+        config = trial['asset_robot']
+        if not isinstance(config, dict) or not isinstance(config.get('usd'), str) or not config['usd']:
+            raise ValueError('asset_robot.usd must reference a local USD file')
+        vector(config['translation'])
+        if 'object_mesh_object' not in trial:
+            raise ValueError('Original robot replay requires object_mesh_object')
     if "hand_mesh_world" in trial:
         mesh = trial["hand_mesh_world"]
         vertices, faces = np.asarray(mesh["vertices"]), np.asarray(mesh["faces"])
