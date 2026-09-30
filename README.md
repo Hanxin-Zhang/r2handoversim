@@ -98,7 +98,13 @@ release's nominal UR5e base. Object names must match the OBJ filenames;
 same object frame as the configured point cloud. Source paths and hashes are
 recorded in results. Assets remain local and are not redistributed.
 
-The original gripper tool frame is calibrated from its finger pads. Playback
+The original gripper tool frame is calibrated from its finger pads. Local-asset
+replay refits the supplied approach to opposing object-mesh surfaces inside the
+flat pads, and inverts the actual Robotiq linkage to set the local contact gap.
+The original grasp is retained in `grasp_contact`; each side must be within
+0.2 mm of its USD collider surface, otherwise the replay fails explicitly.
+Reports show both surface distances. This geometric contact check does not
+measure frictional holding force. Authored Stability failures remain ungrasped. Playback
 moves the USD links kinematically and attaches the object rigidly. PhysX Safe
 checks use the USD robot colliders; Plan/Reach/Affordance retain the documented
 geometric predicates. Existing proxy-tool planning metadata is not presented

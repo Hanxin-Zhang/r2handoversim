@@ -114,11 +114,31 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 from .usd_robot import UsdRobot
                 config = trial['asset_robot']
                 asset_robot = UsdRobot(stage, config['usd'], config['translation'])
-                opening = min(projected_width(trial['object_boxes'], transform(trial['T_object_gripper'])[:3,1]), .085)
-                asset_robot.update(trial['planned_joints'][-1], opening)
+                original_grasp = transform(trial['T_object_gripper'])
+                intentional_width_failure = trial.get('replay_reference', {}).get('assigned_outcome') == 'stability'
+                if not intentional_width_failure:
+                    from .grasp_fit import fit_grasp
+                    fitted, contact_fit = fit_grasp(trial['object_mesh_object'], original_grasp, trial['max_opening_m'])
+                    trial['T_object_gripper'] = fitted.tolist()
+                    opening, pads = asset_robot.calibrate_opening(trial['planned_joints'][-1], contact_fit['width_m'])
+                    # Verify both contacts against the measured USD inner pad faces.
+                    contact_fit['measured_pad_geometry'] = pads
+                    contact_fit['linkage_command_m'] = opening
+                    errors = asset_robot.contact_distances(contact_fit['contact_points_tool'])
+                    contact_fit['bilateral_distance_m'] = errors
+                    if max(errors) > .0002:
+                        raise ValueError(f"{trial['object_id']}: object contacts miss the original finger pad surfaces by {errors} m")
+                    trial['asset_contact_fit'] = contact_fit
+                else:
+                    opening = .085
+                    asset_robot.update(trial['planned_joints'][-1], opening)
+                    trial['asset_contact_fit'] = {'status':'intentional_width_failure',
+                        'scope':'No valid grasp; this reference failure is not corrected into a success'}
                 old_goal = tcp(trial['planned_joints'][-1])
                 tool_offset = inverse(old_goal) @ asset_robot.tool_pose()
-                shift = old_goal @ tool_offset @ inverse(old_goal)
+                old_object_pose = old_goal @ inverse(original_grasp)
+                new_object_pose = old_goal @ tool_offset @ inverse(trial['T_object_gripper'])
+                shift = new_object_pose @ inverse(old_object_pose)
                 trial['T_tcp_asset_tool'] = tool_offset.tolist()
                 trial['target_T_world_gripper'] = (transform(trial['target_T_world_gripper'])@tool_offset).tolist()
                 trial['hand_boxes_world'] = [moved(b, shift) for b in trial['hand_boxes_world']]
@@ -133,7 +153,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
             else:
                 UsdGeom.Imageable(stage.GetPrimAtPath('/World/Table')).MakeVisible()
             if camera == "handover":
-                target = np.asarray(trial["palm_position_world"])
+                target = .8*trial_tcp(trial, trial["planned_joints"][-1])[:3,3] + .2*np.asarray(trial["palm_position_world"])
                 set_camera_view(eye=target+np.array([.48, -.65, .38]), target=target)
             frame_directory = output / f"{trial['id']}_frames"
             if video:
@@ -266,6 +286,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 result['asset_robot'] = {**trial['asset_robot'], 'mesh_count':asset_robot.mesh_count,
                                         'collider_count':len(asset_robot.colliders), 'T_tcp_asset_tool':trial['T_tcp_asset_tool']}
                 result['object_asset'] = {k:trial['object_mesh_object'][k] for k in ('source_path','source_sha256')}
+                result['grasp_contact'] = trial['asset_contact_fit']
             result["hand_collision"] = hand_collision
             result["execution_wall_time_s"] = time.perf_counter() - started
             result["backend"] = "isaacsim-physx"

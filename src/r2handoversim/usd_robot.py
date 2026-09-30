@@ -72,3 +72,61 @@ class UsdRobot:
         z=wrist[:3,2];z=z-y*np.dot(y,z);z/=np.linalg.norm(z)
         pose=np.eye(4);pose[:3,:3]=np.column_stack([np.cross(y,z),y,z]);pose[:3,3]=center+.015*z
         return pose
+
+    def pad_planes(self):
+        """Measured inner pad planes and bounds in the current logical tool frame."""
+        from pxr import Usd, UsdPhysics
+        tool_inverse = np.linalg.inv(self.tool_pose())
+        sides = []
+        for side, sign in [('left', 1), ('right', -1)]:
+            vertices = []
+            root = self.stage.GetPrimAtPath(f'/World/AssetRobot/robotiq_85_{side}_finger_tip_link')
+            for prim in Usd.PrimRange(root):
+                if prim.IsA(self.UsdGeom.Mesh) and prim.HasAPI(UsdPhysics.CollisionAPI):
+                    p = np.asarray(self.UsdGeom.Mesh(prim).GetPointsAttr().Get())
+                    t = tool_inverse @ self.world_matrix(prim.GetPath())
+                    vertices.append(p @ t[:3,:3].T + t[:3,3])
+            p = np.concatenate(vertices)
+            plane = p[:,1].min() if sign == 1 else p[:,1].max()
+            pad = p[np.abs(p[:,1]-plane) < .0001]
+            sides.append({'side':side, 'plane_y_m':float(plane),
+                          'min':pad.min(0).tolist(), 'max':pad.max(0).tolist()})
+        return {'gap_m':sides[0]['plane_y_m']-sides[1]['plane_y_m'], 'pads':sides}
+
+    def calibrate_opening(self, q, desired_gap):
+        """Invert the actual USD linkage instead of assuming gap is linear in angle."""
+        low, high = 0., .085
+        for _ in range(18):
+            command = (low+high)/2
+            self.update(q, command)
+            measured = self.pad_planes()
+            if measured['gap_m'] < desired_gap: low = command
+            else: high = command
+        command = (low+high)/2
+        self.update(q, command)
+        measured = self.pad_planes()
+        if abs(measured['gap_m']-desired_gap) > .0001:
+            raise ValueError('Requested contact gap is outside the original gripper linkage range')
+        return command, measured
+
+    def contact_distances(self, contacts):
+        """Closest surface distances to each original finger collider triangle mesh."""
+        from pxr import Usd, UsdPhysics
+        import trimesh
+        inverse_tool = np.linalg.inv(self.tool_pose())
+        distances=[]
+        for side, contact in zip(('right','left'), contacts):
+            triangles=[]
+            root=self.stage.GetPrimAtPath(f'/World/AssetRobot/robotiq_85_{side}_finger_tip_link')
+            for prim in Usd.PrimRange(root):
+                if not (prim.IsA(self.UsdGeom.Mesh) and prim.HasAPI(UsdPhysics.CollisionAPI)): continue
+                mesh=self.UsdGeom.Mesh(prim);p=np.asarray(mesh.GetPointsAttr().Get())
+                t=inverse_tool@self.world_matrix(prim.GetPath());p=p@t[:3,:3].T+t[:3,3]
+                counts=mesh.GetFaceVertexCountsAttr().Get();indices=mesh.GetFaceVertexIndicesAttr().Get();start=0
+                for count in counts:
+                    face=indices[start:start+count];start+=count
+                    triangles.extend(p[[face[0],face[i],face[i+1]]] for i in range(1,count-1))
+            triangles=np.asarray(triangles)
+            closest=trimesh.triangles.closest_point(triangles,np.tile(contact,(len(triangles),1)))
+            distances.append(float(np.linalg.norm(closest-contact,axis=1).min()))
+        return distances

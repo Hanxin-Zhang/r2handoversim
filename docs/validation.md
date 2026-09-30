@@ -134,3 +134,15 @@ Validated locally with Isaac Sim 5.0.0 on RTX 4070:
 - Six authored reference-outcome examples (success, Plan, Reach, Safe, Stability, Affordance) were retargeted for the original tool and table clearance. Independent simulator predicates matched all six; the Safe example had six detected contact frames.
 - 8,000 bundled reconstructed records match 108 Table I cells. Wheel resource loading and deterministic regeneration checked. These aggregate checks concern reference records, separately from the six simulator examples.
 - 35 CPU tests pass. Optional local assets are not part of CI or redistributed in the wheel.
+
+## Bilateral contact correction (0.7.1)
+
+The first asset replay exposed grasps that followed a tool transform while the
+pads did not reach the object. The asset adapter now fits a shallow insertion
+and a local opposing surface pair, calibrates the nonlinear Robotiq opening,
+and checks each contact against the original finger collider triangles.
+All 16 local object meshes passed the 0.2 mm bilateral-distance threshold.
+The report retains the original grasp and exposes both measured distances.
+The handover camera now includes the grasp location, including for long objects.
+38 CPU tests pass, including detached approaches and objects exceeding aperture.
+This remains geometric contact replay, not a frictional holding-force test.

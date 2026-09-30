@@ -71,9 +71,16 @@ def validate_trial(trial):
         raise ValueError("Reach offset must be finite")
 
 
+def grasp_width(trial):
+    fit = trial.get('asset_contact_fit', {})
+    if fit.get('status') == 'bilateral_surface_fit':
+        return float(fit['width_m'])
+    return projected_width(trial['object_boxes'], transform(trial['T_object_gripper'])[:3, 1])
+
+
 def robot_geometry(trial, q, width=None):
     if width is None:
-        width = projected_width(trial["object_boxes"], transform(trial["T_object_gripper"])[:3, 1])
+        width = grasp_width(trial)
     return arm_boxes(q) + [moved(b, trial_tcp(trial, q)) for b in gripper_boxes(min(width, trial["max_opening_m"]))]
 
 
@@ -84,7 +91,7 @@ def hand_contact(trial, q, width):
 def evaluate(trial, physics_contacts=None):
     validate_trial(trial)
     grasp = transform(trial["T_object_gripper"])
-    width = projected_width(trial["object_boxes"], grasp[:3, 1])
+    width = grasp_width(trial)
     stable = width <= trial["max_opening_m"] + 1e-9
     planned, executed = trial["planned_joints"], trial["executed_joints"]
     target = transform(trial["target_T_world_gripper"])

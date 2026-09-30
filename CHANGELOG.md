@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.1
+
+- Correct detached local-asset grasps by fitting opposing mesh contact surfaces and insertion depth, calibrating actual Robotiq pad spacing, and verifying both contacts against USD collider triangles.
+- Report contact distances and preserve the original grasp before replay fitting. Reject missing contacts rather than attaching an ungrasped object.
+
 ## 0.7.0
 
 - Add configurable original UR5e/Robotiq USD and local OBJ meshes, calibrated tool frames, actual robot collider queries, and USD/MP4 replay exports.
