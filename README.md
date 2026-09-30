@@ -10,22 +10,22 @@ UR5e · Robotiq 2F-85 · Object meshes · Left/right MANO receivers · NVIDIA Is
 
 </div>
 
-[![UR5e handover replay — synchronized workspace and receiving-hand views](docs/media/handover.gif)](https://github.com/Hanxin-Zhang/r2handoversim/releases/download/v0.11.0/handover.mp4)
+[![UR5e handover replay — synchronized workspace and receiving-hand views](docs/media/handover.gif)](https://github.com/Hanxin-Zhang/r2handoversim/releases/download/v0.11.0/handover-natural.mp4)
 
-<p align="center"><b>One handover. Two synchronized views.</b><br>Original robot and object assets, fixed receiving hand, laboratory lighting.<br><a href="https://github.com/Hanxin-Zhang/r2handoversim/releases/download/v0.11.0/handover.mp4">Watch HD video ↗</a></p>
+<p align="center"><b>One handover. Two synchronized views.</b><br>Original robot and object assets, fixed receiving hand, laboratory lighting.<br><a href="https://github.com/Hanxin-Zhang/r2handoversim/releases/download/v0.11.0/handover-natural.mp4">Download HD MP4 ↗</a></p>
 
 ## Explore the scenes
 
-[![Can and screwdriver replay with left and right receiving hands](docs/media/receivers.gif)](https://github.com/Hanxin-Zhang/r2handoversim/releases/download/v0.11.0/receivers.mp4)
+[![Can and screwdriver replay with left and right receiving hands](docs/media/receivers.gif)](https://github.com/Hanxin-Zhang/r2handoversim/releases/download/v0.11.0/receivers-natural.mp4)
 
-**Two objects × two receiving hands, using the A2 setting.** Seeded poses place the palm 0.67–0.85 m horizontally from the robot base. Each receiver stays fixed throughout planning and execution. [Watch the scene montage ↗](https://github.com/Hanxin-Zhang/r2handoversim/releases/download/v0.11.0/receivers.mp4)
+**Two objects × two receiving hands, using the A2 setting.** Full-arm views show each posture and motion. Seeded poses place the palm 0.67–0.85 m horizontally from the robot base. Each receiver stays fixed throughout planning and execution. [Download scene montage ↗](https://github.com/Hanxin-Zhang/r2handoversim/releases/download/v0.11.0/receivers-natural.mp4)
 
 <details>
 <summary><b>Inspect the same trajectory from four cameras</b></summary>
 
-[![Overview, left, right and elevated views of the same replay](docs/media/cameras.jpg)](https://github.com/Hanxin-Zhang/r2handoversim/releases/download/v0.11.0/multiview.mp4)
+[![Overview, left, right and elevated views of the same replay](docs/media/cameras.jpg)](https://github.com/Hanxin-Zhang/r2handoversim/releases/download/v0.11.0/multiview-natural.mp4)
 
-Overview, left, right and elevated views share the same trajectory and evaluated outcome. [Watch synchronized views ↗](https://github.com/Hanxin-Zhang/r2handoversim/releases/download/v0.11.0/multiview.mp4) · [Camera & lighting guide](docs/rendering.md)
+Overview, left, right and elevated views share the same trajectory and evaluated outcome. [Download synchronized views ↗](https://github.com/Hanxin-Zhang/r2handoversim/releases/download/v0.11.0/multiview-natural.mp4) · [Camera & lighting guide](docs/rendering.md)
 
 </details>
 

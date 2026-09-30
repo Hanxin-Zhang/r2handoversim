@@ -285,3 +285,19 @@ and the previously verified FS screwdriver replay as synchronized dual-view and
 four-camera media. Inline GIFs link to HD MP4 attachments. The
 [media record](media/recordings.json) retains each displayed trial's evaluated
 outcome and method setting.
+
+## Posture-reviewed showcase — 2026-10-01
+
+The current hero is the seed-41 screwdriver right-receiver sample 5, selected
+with FS and evaluated in Isaac Sim. Its endpoint joint angles are
+`[18.05, -51.89, 55.70, -84.29, -140.87, 6.31]` degrees: a bent elbow and a small
+terminal wrist roll. All five checks passed across 91 executed frames.
+Overview, left, right and elevated recordings passed `verify-output` and have
+identical trajectory arrays and evaluated metrics.
+
+The A2 gallery uses can samples 10/5 and screwdriver samples 0/21 (left/right),
+all from the same seed-41 receiver bank and configured outward bounds. The
+four trajectories contain 79, 97, 169 and 127 frames; all applicable checks
+passed. The full-arm camera views replay those resolved scenes. Each method
+selection was recomputed on its sampled scene before simulation. Media sample
+IDs, endpoint angles and outcomes are retained in [recordings.json](media/recordings.json).

@@ -68,7 +68,7 @@ planning failure, not proof that no feasible path exists.
 
 ![Original-asset replay from four camera views](media/cameras.jpg)
 
-[Watch the synchronized replay](https://github.com/Hanxin-Zhang/r2handoversim/releases/download/v0.11.0/multiview.mp4).
+[Download the synchronized replay](https://github.com/Hanxin-Zhang/r2handoversim/releases/download/v0.11.0/multiview-natural.mp4).
 
 ## Use the static hand triangles for Safe
 
