@@ -1,7 +1,6 @@
 """Portable numerical pose IK and bidirectional RRT-Connect over box proxies.
 
-Reconstructs the paper's IK/search stages without ROS/MoveIt. This is a release
-implementation, not the original planner, robot CAD, or continuous checking.
+Implements full-pose IK, seeded search and sampled proxy collision checks.
 """
 from copy import deepcopy
 import time

@@ -1,7 +1,6 @@
 """Standalone mesh demos, without method weights or dataset manifests.
 
 Approaches, receiving hands and trajectories are authored geometric fixtures.
-They are not baseline predictions or recovered paper trials.
 """
 import json
 from pathlib import Path
@@ -76,8 +75,8 @@ def generate(config_path, output, names=None):
             palm_position_world=points(world_object,palm_object).tolist(),
             palm_normal_world=(-target[:3,2]).tolist(),
             planned_joints=path, executed_joints=path,
-            provenance='Local mesh; authored geometric grasp approach, hand proxy and joint replay; not paper experiments',
-            annotation_status='Geometry-only S0 demonstration; no original functional-region labels',
+            provenance='Local mesh; authored geometric grasp approach, hand proxy and joint replay',
+            annotation_status='Geometry-only S0 demonstration with generated region annotations',
             source_data={'mesh_sha256':mesh['source_sha256'], 'mesh_path':mesh['source_path']})
         validate_trial(trial)
         trials.append(trial)

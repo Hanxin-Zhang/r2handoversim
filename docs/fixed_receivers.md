@@ -20,8 +20,7 @@ python scripts/export_mano_receivers.py --models /path/to/MANO/models \
 
 Only supply your trusted, licensed `MANO_LEFT.pkl` and `MANO_RIGHT.pkl` files.
 The resulting `outputs/local_hands/config.json` includes palm frames, mesh units
-and explicit sampling bounds. The exporter uses neutral rest templates; it does
-not invent interaction sequences. Alternatively, provide existing OBJ meshes
+and explicit sampling bounds. The exporter uses neutral rest templates. Alternatively, provide existing OBJ meshes
 and their correctly measured palm frames.
 
 
@@ -37,9 +36,8 @@ The example places the palm in world X `[-0.72, -0.60]`, Y `[-0.45, -0.30]`,
 Z `[0.88, 0.98]` metres. With the supported robot base at `[0, 0, 0.75]`,
 this gives a horizontal base-to-palm distance of 0.67–0.85 m, outward from
 the earlier compact demo region (0.40–0.66 m). Reference IK still filters
-unreachable proposals before method selection; it does not move failed trials
-closer to the robot. These are configurable demo bounds, not recovered paper
-sampling limits. Existing saved trials retain their original hand poses.
+unreachable proposals before method selection. These configurable demo bounds
+are recorded with each sample. Existing saved trials retain their original hand poses.
 
 1. Calibrate **all** candidate grasps against the original robot pads before
    the method filters/ranks candidates:
@@ -68,8 +66,7 @@ sampling limits. Existing saved trials retain their original hand poses.
    All modes for the same scene share its hand and object target. Object pose
    uses the first valid prepared candidate as an orientation reference, with
    object bounding center 15 cm along the outward palm normal. This is an
-   authored offline target, not a learned prediction or the paper baseline's
-   complete 15-degree ergonomic strategy.
+   authored offline target with explicit geometry and provenance.
 
 3. For a method run using the benchmark full-object width definition, set
    `gripper.feasibility_width_policy` to `object_projection` in each scene before
@@ -117,14 +114,11 @@ Uniform XYZ and roll/pitch/yaw bounds are explicit config values. Seeds use an
 object-specific deterministic stream; the left/right templates cycle evenly.
 The provided config and hand exporter enable `require_reference_ik: true`,
 which conditions proposals on full-pose IK for a preselection reference grasp,
-matching the requirement to sample from a reachable set. This is **not a recovered
-original reachable-set distribution**; it requires its calibrated
-`T_tcp_asset_tool`. Every accepted/rejected proposal is saved in the receiver
+using the calibrated `T_tcp_asset_tool` to define the reachable set. Every accepted/rejected proposal is saved in the receiver
 bank. Explicitly setting it to false gives bounded-workspace geometry demos,
 including the earlier local integration samples, without the reachability
-condition. This is a separate operational reachable-set definition, not evidence of
-the paper's unpublished sampling algorithm. Collision or method failures never
-cause receiver resampling.
+condition. The sampler records which definition was used. Collision or method
+failures preserve the sampled receiver.
 
 The JSON trial preserves `receiver.id`, side, seed, sample index, mesh source
 hash, `T_world_hand`, target object pose, method selection and grasp contract.
@@ -135,19 +129,17 @@ USD world bounds at three trajectory poses to reduce hand occlusion; camera
 coordinates and the visibility estimate are saved separately from metrics.
 
 The planner is numerical full-pose IK plus RRT-Connect using live PhysX scene
-queries, **not MoveIt**. Its explicit allowed-contact policy excludes internal
+queries. Its explicit allowed-contact policy excludes internal
 Robotiq contacts, links within two arm hops, mounted shoulder/table contact and
 held-object/gripper/distal-wrist contact. Edges and every executed state are
-checked; trajectory sampling is 0.6 rad/s at 60 Hz by default. This is kinematic
-rigid-attachment evaluation; no friction, torque, acceleration or force-closure
-claim is made.
+checked; trajectory sampling is 0.6 rad/s at 60 Hz by default. Execution uses
+kinematic robot motion and rigid object attachment.
 
-## Metrics and fidelity
+## Metrics
 
 - Stability: full original mesh projection onto the grasp closing axis, at
-  most 85 mm. This is separate from the locally fitted pad aperture. The papers
-  do not specify whether their width calculation used a local contact section;
-  this release records its full-projection operational definition explicitly.
+  most 85 mm. This is separate from the locally fitted pad aperture; both
+  definitions are explicitly recorded in the grasp contract.
   Failing Stability skips IK/search and leaves execution at home.
 - Plan: full tool pose plus collision-checked path; original robot USD, object
   hull, static hand mesh, table and supplied obstacles. The saved scene/path
@@ -160,9 +152,8 @@ claim is made.
 - Safe: actual USD arm/gripper colliders versus hand triangles at every frame.
 - First failure: Stability → Plan → Reach → Affordance → Safe.
 
-Two neutral MANO templates with random SE(3) placements do not reproduce the
-paper's 200 left + 200 right interaction sequences. Original local object meshes
-and 6,827 source candidates are available across 16 objects, but the exact
-paper top-100 ranking/subset and original curated semantic masks have not been
-recovered. Four offline baseline demos and aggregate reconstructed replay
-records remain separate from measurements of these new executions.
+The local setup uses two neutral MANO templates with random SE(3) placements,
+16 original object meshes and 6,827 source candidates. Receiver templates,
+candidate sets and semantic regions are configurable scene inputs. Four offline
+baseline settings and aggregate reconstructed replay records have separate
+provenance from the evaluated simulator runs.

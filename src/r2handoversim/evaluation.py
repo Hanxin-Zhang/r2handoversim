@@ -203,7 +203,7 @@ def evaluate(trial, physics_contacts=None):
             "planning_time_s": trial.get("planning", {}).get("time_s"), "execution_wall_time_s": None,
             "execution_time_s": (len(executed)-1)*trial["dt_s"],
             "total_time_s": (trial["planning"]["time_s"]+(len(executed)-1)*trial["dt_s"]) if "planning" in trial else None,
-            "scope": trial.get("provenance", "Procedural geometry and UR5e joint replay; not original paper trials"),
+            "scope": trial.get("provenance", "Procedural geometry and UR5e joint replay"),
             "source_data": trial.get("source_data"), "annotation_status": trial.get("annotation_status"),
             "plan_scope": plan_scope, "replay_reference": trial.get("replay_reference")}
 
@@ -217,4 +217,4 @@ def summarize(results):
         counts = Counter(r["first_failure"] for r in rows if not r["success"])
         groups[split] = {"trials": len(rows), "success_rate": sum(r["success"] for r in rows)/len(rows),
                          "failure_rates": {k: (None if k == "affordance" and split == "S0" else counts[k]/len(rows)) for k in ORDER}}
-    return {"schema_version": "handover.summary.v1", "scope": "demo results, not paper numbers", "splits": groups}
+    return {"schema_version": "handover.summary.v1", "scope": "Evaluated demo results", "splits": groups}

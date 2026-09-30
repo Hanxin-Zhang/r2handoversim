@@ -43,7 +43,7 @@ Each grasp gets its own pose-IK/RRT-Connect plan using the same random seed.
 Planning failures remain in `trials.json` and count as failures in evaluation.
 `conversion.json` lists selections with no feasible grasp separately: they
 cannot be replayed and are excluded from simulator denominators, so inspect
-that file along with `report.html`. No converter claims paper success rates.
+that file along with `report.html` to interpret the evaluated population.
 
 Reports contain per-mode results, first-failure attribution and the existing
 object/split aggregation. `evaluate --trials ...` is available for CPU inspection;

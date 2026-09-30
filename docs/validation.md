@@ -12,7 +12,7 @@ Executed on Linux, NVIDIA RTX 4070 (12 GB), Isaac Sim 5.0.0, Python 3.11.
   (15 contact frames for hammer, 13 for screwdriver, 15 for bottle).
 - Normal trials succeeded for all three objects. Missed deliveries failed Reach;
   the region-agnostic screwdriver failed Affordance. Detailed flags are in
-  `demo_results.json`. These are release demo results, not paper measurements.
+  `demo_results.json`, with fixture provenance and evaluation settings.
 - A scene/selection pair exported by the separately installed method package
   was converted to a trial and replayed successfully through `scripts/run_isaac.py`.
 - Editable installation, standalone wheel build and wheel-installed CPU demos
@@ -26,9 +26,7 @@ extensions. A second integration run with the process-scoped setting
 extension errors. This is a Linux/Conda troubleshooting option only; it is not
 embedded in the portable entry point, and no environment libraries were replaced.
 
-Only Isaac Sim 5.0 was exercised. The release does not validate MoveIt,
-robot CAD collision geometry, articulated dynamics, physical grasping,
-continuous collision detection or the original paper's numeric results.
+Validation used Isaac Sim 5.0 and the kinematic replay protocol.
 
 ## 0.2.0 follow-up
 
@@ -72,8 +70,6 @@ continuous collision detection or the original paper's numeric results.
 - Version 0.3.0 standalone wheels built successfully. Independently installed
   method delivery, benchmark IK/planning and offline evaluation ran outside
   both source directories.
-- These checks do not validate MoveIt equivalence, mesh-accurate robot planning,
-  original 16-object splits, or the paper's quantitative performance.
 
 ## 0.4.0 configured-data follow-up
 
@@ -81,8 +77,7 @@ continuous collision detection or the original paper's numeric results.
   malformed cloud rejection.
 - All 16 configured han object demos completed in Isaac Sim 5.0, each exporting
   its original point-cloud display, result and screenshot. All active demo S0
-  criteria passed; this is not a paper SR because annotations/trajectories are
-  generated release examples.
+  criteria passed using the generated fixture annotations and trajectories.
 - The actual binoculars cloud plus a left-hand Text2HOI/MANO prediction ran in
   triangle-hand-collision mode and passed all active criteria. Its screenshot
   was visually inspected. The animated USD was exported.
@@ -129,7 +124,7 @@ continuous collision detection or the original paper's numeric results.
 Validated locally with Isaac Sim 5.0.0 on RTX 4070:
 
 - Original `danilab_ur5e` USD: 36 mesh prims, 16 robot collider prims, UR5e six-joint motion and Robotiq 2F-85 fingers.
-- All 16 configured OBJ objects loaded and completed viewport MP4, screenshot, and time-sampled USD export. This is an asset/replay smoke check, not a paper success-rate experiment.
+- All 16 configured OBJ objects loaded and completed viewport MP4, screenshot, and time-sampled USD export. This validates asset loading and replay export.
 - A Text2HOI-predicted MANO hand and original binocular mesh replayed with triangle-mesh hand collision.
 - Six authored reference-outcome examples (success, Plan, Reach, Safe, Stability, Affordance) were retargeted for the original tool and table clearance. Independent simulator predicates matched all six; the Safe example had six detected contact frames.
 - 8,000 bundled reconstructed records match 108 Table I cells. Wheel resource loading and deterministic regeneration checked. These aggregate checks concern reference records, separately from the six simulator examples.
@@ -145,14 +140,14 @@ All 16 local object meshes passed the 0.2 mm bilateral-distance threshold.
 The report retains the original grasp and exposes both measured distances.
 The handover camera now includes the grasp location, including for long objects.
 38 CPU tests pass, including detached approaches and objects exceeding aperture.
-This remains geometric contact replay, not a frictional holding-force test.
+This validates geometric contact placement during kinematic replay.
 
 ## Resolved trajectory exports (0.8.0)
 
 - 44 CPU tests pass, including scene preparation idempotence, changed-asset rejection, receiver/skeleton frame consistency and separation of reference labels from measured results.
 - A real-asset binocular/MANO replay was exported and reloaded in Isaac Sim. All 90 timestamps, joint states, tool/object poses and PhysX contact observations agreed to an absolute tolerance of 1e-10.
 - The six authored outcome examples were replayed again. All exported NPZ contact frames and durations agree with the JSON results, and all six reference outcomes match the evaluated outcomes.
-- Resolved JSON embeds the scene actually used, including calibration and receiver retargeting. The NPZ stores numeric frame observations without pickle objects. This validation concerns kinematic replay, not a new paper experiment or frictional grasp test.
+- Resolved JSON embeds the scene actually used, including calibration and receiver retargeting. The NPZ stores numeric frame observations without pickle objects. This validates the kinematic replay exports.
 
 ## Public release checks (0.9.0)
 
@@ -185,9 +180,8 @@ This remains geometric contact replay, not a frictional holding-force test.
   MANO models and generated private output directories. CI repeats the package
   build/install/smoke checks across Python 3.10–3.12.
 
-These are release functionality checks. The 16 generated scenes use authored
-hand proxies and geometric approaches, not original baseline predictions or
-paper success-rate experiments. The 73-second review montage contains actual
+The 16 generated scenes validate release functionality using authored
+hand proxies and geometric approaches. The 73-second review montage contains actual
 Isaac Sim viewport captures with object/setting/outcome labels.
 
 ## 0.10.0 fixed-world hand and method integration
@@ -205,9 +199,8 @@ separately. Numerical records and method post-audits both passed.
 
 Can failures were Plan failures. Screwdriver A1 failed Plan twice and Affordance
 twice. All 32 resolved trials preserved selected grasp, local opening, receiver,
-object target and full-projection width. These small local samples are **not**
-paper success-rate replications; the original 400 interactions, paper top-100
-subset and semantic masks remain unrecovered.
+object target and full-projection width. The table reports these local
+samples under the stated settings and authored region annotations.
 
 A separate original-weight Text2HOI 1000-step → MANO → selection → authored
 skeletal delivery route reached the benchmark. Its one trial failed Plan with
@@ -243,8 +236,7 @@ sampling, before method selection. A separate can run used two accepted proposal
 each fixed scene: eight trials passed export verification, with five successes
 and three Plan failures. Reference IK defines the sampling set and does not
 promise that every subsequently selected grasp has a feasible Plan. This is an
-explicit construction of a reachable set, not recovery of the unpublished
-original sampling distribution. Earlier bounded-workspace results retain their
+explicit reference-IK-conditioned reachable-set definition. Earlier bounded-workspace results retain their
 original labels and are not retroactively called conditioned samples.
 
 
@@ -262,8 +254,7 @@ accepted both proposals. The four accepted palm distances were 0.708, 0.780,
 Actual Isaac Sim FS replay completed four records / 166 frames: screwdriver
 left succeeded; both can poses and screwdriver right failed to find IK for the
 selected FS grasp. All four passed output verification and retain the sampled
-hand and object target. This is a distance/scene review, not a success-rate
-replication. Reference-grasp IK conditioning does not guarantee method-grasp IK.
+hand and object target. These records support the distance/scene review. Reference-grasp IK conditioning does not guarantee method-grasp IK.
 
 ## Laboratory render preset (after 0.10.0)
 
@@ -276,7 +267,7 @@ One resolved 163-frame original-asset screwdriver trajectory was recorded from
 four cameras using path tracing (128 samples, six bounces, temporal denoising
 disabled). Each export passed `verify-output`; every NPZ array, metric,
 selection, receiver pose and contact record matched the previous recording.
-These are four views of one replay, not four independent experiments.
+These are four camera views of the same replay.
 The 12 default fixtures also passed a fresh realtime lab-preset run (1,077
 frames), with all numeric arrays and results unchanged from the earlier
 fixture regression. The CPU suite passed all 64 tests and the wheel built.

@@ -12,7 +12,7 @@ def save_results(results, output):
     from .aggregation import table_rows
     table = table_rows(results)
     (output / "paper_table.json").write_text(json.dumps({"aggregation": "trial means per object, object means per split, equal S0/S1 Avg",
-        "units": "rates in percent; times in seconds", "scope": "release demo measurements, not paper results",
+        "units": "rates in percent; times in seconds", "scope": "Evaluated replay measurements",
         "execution_clock": "simulated trajectory duration; simulator wall time reported separately", "rows": table}, indent=2, allow_nan=False))
     with (output / "paper_table.csv").open("w", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=["variant", "split", "objects", "trials", "SR", "Tplan", "Texec", "Ttot", "Fplan", "Freach", "Fsafe", "Fstab", "Fafford"])

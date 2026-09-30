@@ -1,6 +1,6 @@
 """Fit a replay grasp to opposing mesh surfaces inside the actual pad window.
 
-This is geometric contact placement, not frictional grasp dynamics.
+Computes geometric contact placement for kinematic replay.
 """
 import numpy as np
 from .geometry import transform
@@ -65,5 +65,5 @@ def fit_grasp(mesh, grasp, max_opening=.085):
             'original_T_object_gripper':original.tolist(),'T_object_gripper':corrected.tolist(),
             'translation_in_original_tool_m':center.tolist(),'contact_points_tool':contacts.tolist(),
             'pad_window_tool_m':{'x':[-.010,.010],'z':[-.022,.010]},
-            'scope':'Opposing mesh surfaces inside flat finger pads; kinematic contact placement, no force/friction claim'}
+            'scope':'Opposing mesh surfaces inside flat finger pads; kinematic contact placement'}
     raise ValueError('No opposing object surfaces fit within the Robotiq pad window and aperture')

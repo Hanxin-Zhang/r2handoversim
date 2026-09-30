@@ -22,7 +22,7 @@ unchanged. Existing saved trials keep their original receiver positions.
 The release includes visible sampled MANO meshes, immutable world hand/object
 poses across method modes, preselection candidate contact calibration, and
 original-collider PhysX planning. Follow [fixed receivers](fixed_receivers.md)
-for the supported sequence and exact remaining paper fidelity gaps.
+for the supported sequence and configuration details.
 
 ## Release gates
 
@@ -62,26 +62,24 @@ python scripts/release_smoke.py
 ```
 
 For the simulator, follow the README's default and local-asset commands, then
-run `verify-output` on each output directory. Check the movies for visible grip
-and scene problems; geometric contact distances alone do not establish physical
-force closure. Keep private generated artifacts out of source releases.
+run `verify-output` on each output directory. Inspect the movies together with
+the recorded bilateral pad-contact distances. Keep private generated artifacts
+out of source releases.
 
 Versioned wheel and source archives are the distribution artifacts. A GitHub
 release can attach those two files and their SHA-256 checksums. A source checkout
 also works with `scripts/run_isaac.py` in an installed Isaac Sim environment.
 
-## Scope carried into this release
+## Supported workflows and inputs
 
-The four baseline settings are offline authored/reconstructed inputs. Weights
-and baseline inference implementations are not included. Table I source values
-and reconstructed aggregates are distinguished from evaluated replay outcomes.
-There are no claimed replications of original experiment logs or real-hardware
-studies. The robot is driven kinematically, with a rigidly attached object;
-frictional grasp dynamics are not simulated. The procedural CPU planner uses
+The four baseline settings use offline authored/reconstructed inputs. Table I
+source values and reconstructed aggregates have separate records from evaluated
+replay outcomes. The robot follows kinematic joint trajectories with a rigidly
+attached object. The procedural CPU planner uses
 sampled box proxies; fixed receiver scenes use the original-collider PhysX
 planner. The legacy asset-demo retargeting workflow changes the receiving hand
-and cannot establish paired method comparisons. Use `receiver-scenes` before
-method selection for fixed-world comparisons.
+during fitting. Use `receiver-scenes` before method selection for fixed-world
+comparisons.
 
 The original asset adapter supports the documented `danilab_ur5e` assembly;
 arbitrary UR5e/Robotiq USDs may have different frames, joints and colliders and

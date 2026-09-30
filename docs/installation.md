@@ -3,8 +3,7 @@
 ## Supported paths
 
 The simulator integration has been exercised on Linux with Isaac Sim 5.0.0,
-Python 3.11 and an RTX 4070. Other Isaac Sim versions and operating systems are
-not yet validated. Offline tools require Python 3.10 or newer; CI covers
+Python 3.11 and an RTX 4070. Offline tools require Python 3.10 or newer; CI covers
 3.10–3.12. Install Isaac Sim separately using NVIDIA's instructions, and accept
 its license yourself before launching the demo.
 

@@ -59,4 +59,4 @@ def verify_output(directory):
             frames += len(q)
     return {'schema_version':'handover.output_verification.v1', 'status':'passed',
             'trials':len(rows), 'frames':frames,
-            'scope':'Internal consistency of replay exports; no new simulator execution or paper measurement'}
+            'scope':'Internal consistency check of saved replay exports'}

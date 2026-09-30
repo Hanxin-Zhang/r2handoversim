@@ -1,6 +1,6 @@
 """UR5e nominal DH kinematics and explicit box collision proxies.
 
-This lightweight demo replays joint trajectories; it is not MoveIt/RRT-Connect.
+Provides forward kinematics and proxy shapes for joint-trajectory replay.
 DH dimensions follow Universal Robots' published nominal parameters.
 """
 import numpy as np

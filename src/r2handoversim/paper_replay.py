@@ -216,7 +216,7 @@ def materialize(record, dataset=None, samples=90):
     trial["replay_reference"] = {"record_kind": KIND, "record_id": record["id"], "source_table": "I",
         "assigned_outcome": outcome, "reference_stage_time_s": record["stage_time_s"],
         "assigned_hand": record["hand"], "receiver_template_index": record["receiver_sequence_index"],
-        "receiver_geometry": "from supplied scene or demo; template index does not load an original interaction sequence",
+        "receiver_geometry": "supplied scene or demo; template index is replay metadata",
         "geometry_source": geometry_source, "setting": reference()["methods"][record["method"]],
         "trajectory_source": "reconstructed keyframes; measured simulator flags are evaluated independently"}
     trial["provenance"] = "Reconstructed paper replay"

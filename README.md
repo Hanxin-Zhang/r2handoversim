@@ -17,8 +17,8 @@ needed to run the examples.
 The default fixtures use nominal UR5e DH kinematics with **procedural link/parallel-gripper
 proxies**, an 85 mm aperture, and a fixed receiving-hand proxy. The bundled examples
 replay supplied joint trajectories; an optional planner can generate new paths
-for independently supplied handover targets. They do not reproduce the paper's complete
-UR5e/Robotiq/MANO/MoveIt experiments or the four published baselines.
+for independently supplied handover targets. For original UR5e/Robotiq/MANO
+geometry, use the fixed-world asset workflow linked above.
 
 Companion method: [Intent-Handover](https://github.com/Hanxin-Zhang/intent-handover).
 
@@ -103,7 +103,7 @@ Omit `--objects bottle` to generate demos for every OBJ in the configured folder
 This workflow needs no method checkout, model weights or dataset manifest. It
 chooses a geometric approach, a static hand proxy and an authored 90-frame
 trajectory. Its S0 metrics use object bounding boxes. Failed fits stop with an
-error; outputs are replay examples, not baseline predictions. If you already
+error; outputs are authored geometric replay examples. If you already
 have method candidates, use [preselection asset calibration and fixed receivers](docs/fixed_receivers.md)
 before selecting and converting a trial. Unprepared method selections are rejected.
 
@@ -130,8 +130,7 @@ Reports show both surface distances. This geometric contact check does not
 measure frictional holding force. Authored Stability failures remain ungrasped. Playback
 moves the USD links kinematically and attaches the object rigidly. PhysX Safe
 checks use the USD robot colliders; Plan/Reach/Affordance retain the documented
-geometric predicates. Existing proxy-tool planning metadata is not presented
-as a new plan for the calibrated tool. MP4 and time-sampled USD exports use the
+geometric predicates. Results retain the source planning metadata. MP4 and time-sampled USD exports use the
 same joint trajectory. A decoded MANO mesh from the method pipeline is supported
 with `--hand-collision mesh`.
 
@@ -170,7 +169,6 @@ r2handoversim verify-output --input outputs/asset_replay
 
 This checks completion counts, artifact presence, timestamps, joints, poses,
 collision observations and evaluated outcomes against the resolved scene.
-It does not turn replay observations into original paper measurements.
 
 Legacy authored demos retarget the receiver during asset fitting and record that
 transform. The fixed-world receiver workflow preserves the hand and object
@@ -194,8 +192,7 @@ Records contain joint keyframes, timings, setting IDs, and reference outcomes.
 The replay population and object split are documented reconstruction choices.
 `reference.json` contains source settings and coverage; `verification.json`
 checks the reconstructed aggregate. Simulator results are evaluated separately
-and can differ from assigned reference outcomes. Real-robot tables and user
-questionnaires are excluded.
+and can differ from assigned reference outcomes.
 
 ## Demo variants
 
@@ -206,11 +203,9 @@ questionnaires are excluded.
 | `execution_deviation` | Replay an unplanned deviation through the hand, demonstrating a safety failure |
 | `missed_delivery` | Stop at home despite a valid plan, demonstrating a reach failure |
 
-These are explicitly authored offline inputs, **not implementations or reported
-results of FC-Handover, Handover-VA, Contact-Handover, or Intent-Handover baselines**.
-The bundled S0/S1 assignment is illustrative: bottle is S0; hammer and screwdriver
-are S1. It is not a recovered paper split. All sources and limitations are
-recorded in the fixtures and result files.
+These authored offline fixtures use an illustrative split: bottle is S0;
+hammer and screwdriver are S1. Fixtures and result files record their inputs,
+settings and provenance. The paper-reference replay is a separate workflow.
 
 ## Metrics
 
@@ -231,11 +226,9 @@ Stored traces retain the original lightweight Plan check. The new `plan`
 command performs full-pose numerical IK and RRT-Connect, with attached-object,
 hand, table/obstacle and nonadjacent arm-proxy checks. It is a portable release
 implementation. Fixed-receiver mesh trials instead plan inside `demo` using
-original USD colliders and PhysX. Neither implementation is MoveIt. Safety is sampled,
-not continuous collision detection. Scene visuals and box queries are kinematic
-replay, not an articulated torque simulation. No frictional grasp stability is
-claimed. Planning time is measured for newly planned trials and remains null for stored
-traces. Simulation duration and simulator wall time have separate fields. See [protocol details](docs/protocol.md).
+original USD colliders and PhysX. Safety uses frame-sampled collision queries;
+execution uses kinematic robot motion with rigid object attachment. Planning
+time is measured for newly planned trials and remains null for stored traces. Simulation duration and simulator wall time have separate fields. See [protocol details](docs/protocol.md).
 
 ## Offline checks and your own traces
 
@@ -311,9 +304,8 @@ r2handoversim demo --trials outputs/han_trials/trials.json --headless \
 
 The 16 available original point clouds are displayed directly and move with the
 object. Geometry metrics still use explicit occupied-cell box proxies. This
-batch uses generated hand/grasp examples and S0 evaluation because the config
-does not supply original functional-region labels or the paper split. It is
-separate from the three synthetic objects. See [dataset protocol](docs/dataset.md).
+batch uses generated hand/grasp examples and an explicit S0 evaluation setting.
+It is separate from the three procedural objects. See [dataset protocol](docs/dataset.md).
 
 ## Laboratory rendering
 

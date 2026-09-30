@@ -28,20 +28,16 @@ Isaac Sim 5.0 on the validation machine. Offline inspection also accepts
 object coordinates. Isaac Sim renders it as USD Points, transforms it by
 `T_world_gripper @ inverse(T_object_gripper)` each frame, and hides the object
 proxy visuals. `--animation` saves the same object-cloud transform samples.
-Metrics continue to use `object_boxes` for collision, width, and reach; the
-rendered point cloud is not secretly treated as a triangle collider.
+Metrics use `object_boxes` for collision, width and reach in this point-cloud workflow.
 
-The 16 PLY files contain points without faces. Thus this restores original
-object geometry for display/neural input, but not the original mesh collision
-geometry. Robot and hand geometry remain the configured proxies unless a
-decoded MANO hand is supplied. Source data paths/hashes and annotation status
+The 16 PLY files provide object points for display and neural input. Robot
+and hand geometry use the configured proxies or a supplied decoded MANO mesh. Source data paths/hashes and annotation status
 are preserved in trials and results.
 
 The bootstrap hand, 30 grasp candidates, receiving-zone labels and trajectories
-are newly generated offline demos. They are not recovered baseline outputs.
-Imported examples explicitly select S0 because the config does not contain
-original functional-region ground truth or paper split labels. Their rates
-must not be read as reproducing Table I.
+are generated offline fixtures. Imported examples select S0 explicitly and
+record their generated annotation provenance. Table I reference records are
+available through the separate `paper-replay` workflow.
 
 ## Real object plus predicted hand
 

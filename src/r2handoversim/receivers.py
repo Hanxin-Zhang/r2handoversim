@@ -74,7 +74,7 @@ def apply_receiver(trial, template, hand_pose, seed, index):
     result['receiver']={'id':f"receiver_{seed}_{index:04d}_{template['side']}", 'template_id':template['id'],
         'side':template['side'], 'seed':seed, 'sample_index':index,'T_world_hand':hand_pose.tolist(),
         'static_world':True,'source':deepcopy(template['source']),
-        'sampling_scope':'Seeded SE(3) placement of local hand templates; not recovered original interaction sequences'}
+        'sampling_scope':'Seeded SE(3) placement of supplied local hand templates'}
     result['receiver_protocol']={'policy':'fixed_world','replan_in_isaac':True,
         'hand_collision':'mesh','object_collision':'convexHull', 'planner':'isaacsim_physx_rrt_connect'}
     return result
