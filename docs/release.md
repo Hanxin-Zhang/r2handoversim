@@ -1,9 +1,16 @@
-# Release 0.9.0
+# Release 0.10.0
 
 This release is ready for users to install and run kinematic handover replay.
 Its supported workflows are procedural Isaac Sim demos, original local
 UR5e/Robotiq and OBJ replay, method JSON interchange, and paper-reference replay.
 The main benchmark entry point runs Isaac Sim; CPU evaluation is auxiliary.
+
+## Fixed receiver integration
+
+This release adds visible sampled MANO meshes, immutable world hand/object
+poses across method modes, preselection candidate contact calibration, and
+original-collider PhysX planning. Follow [fixed receivers](fixed_receivers.md)
+for the supported sequence and exact remaining paper fidelity gaps.
 
 ## Release gates
 
@@ -37,7 +44,7 @@ Run tests in an environment with the optional `planning,assets` dependencies.
 python -m pip install build twine
 python -m build
 python -m twine check dist/*
-python -m pip install './dist/r2handoversim-0.9.0-py3-none-any.whl[planning,assets]'
+python -m pip install './dist/r2handoversim-0.10.0-py3-none-any.whl[planning,assets]'
 python -m unittest discover -s tests -v
 python scripts/release_smoke.py
 ```

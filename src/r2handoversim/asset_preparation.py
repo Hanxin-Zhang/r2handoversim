@@ -63,7 +63,21 @@ def prepare(trial, robot):
     else:
         original_grasp = transform(result['T_object_gripper'])
         oversized = projected_width(result['object_boxes'], original_grasp[:3,1]) > result['max_opening_m']
-        if result.get('replay_reference', {}).get('assigned_outcome') == 'stability' and oversized:
+        selected = result.get('method_selection')
+        if selected:
+            prepared = selected.get('geometry_preparation') or {}
+            if prepared.get('schema_version') != 'handover.asset_candidate.v1' or prepared.get('status') != 'bilateral_surface_fit':
+                raise ValueError('Method grasp needs prepare-candidates with the original assets before selection; post-selection fitting is disabled')
+            if prepared['robot'] != result['asset_robot'] or prepared['mesh_sha256'] != digest:
+                raise ValueError('Selected candidate was prepared for different robot/object assets')
+            if not np.allclose(original_grasp,prepared['T_object_gripper'],atol=1e-10,rtol=0):
+                raise ValueError('Selected grasp differs from its pre-selection asset calibration')
+            if not np.isclose(result['gripper_opening_m'],prepared['width_m'],atol=1e-7,rtol=0):
+                raise ValueError('Selected opening differs from its asset contact width')
+            fit = deepcopy(prepared)
+            fit['contact_points_tool'] = deepcopy(prepared['contact_points_asset_tool'])
+            result['T_asset_tool_grasp_frame'] = deepcopy(prepared['T_asset_tool_grasp_frame'])
+        elif result.get('replay_reference', {}).get('assigned_outcome') == 'stability' and oversized:
             fit = {'status': 'intentional_width_failure',
                    'scope': 'No valid grasp; this reference failure is not corrected into a success'}
         else:
@@ -84,7 +98,7 @@ def prepare(trial, robot):
     else:
         raise ValueError('Unknown resolved contact status')
     old_goal = tcp(result['planned_joints'][-1])
-    offset = inverse(old_goal) @ robot.tool_pose()
+    offset = inverse(old_goal) @ robot.tool_pose() @ transform(result.get('T_asset_tool_grasp_frame',np.eye(4)))
     if saved:
         if not np.allclose(offset, result['T_tcp_asset_tool'], atol=1e-5, rtol=0):
             raise ValueError('Resolved USD tool frame changed; regenerate from the original trial')
@@ -93,18 +107,27 @@ def prepare(trial, robot):
         new_object = old_goal @ offset @ inverse(result['T_object_gripper'])
         shift = new_object @ inverse(old_object)
         result['T_tcp_asset_tool'] = offset.tolist()
-        result['target_T_world_gripper'] = (transform(result['target_T_world_gripper']) @ offset).tolist()
+        fixed = result.get('receiver_protocol',{}).get('policy') == 'fixed_world'
+        if fixed:
+            shift = np.eye(4)
+            result['target_T_world_gripper'] = (transform(result['target_T_world_object']) @
+                                                transform(result['T_object_gripper'])).tolist()
+        else:
+            result['target_T_world_gripper'] = (transform(result['target_T_world_gripper']) @ offset).tolist()
         if 'delivery' in result: result['pre_asset_delivery'] = deepcopy(result['delivery'])
-        move_receiver(result, shift)
+        if not fixed: move_receiver(result, shift)
         if 'planning' in result: result['pre_asset_planning'] = result.pop('planning')
         result['asset_preparation'] = {
             'schema_version': 'handover.asset_preparation.v1', 'robot': deepcopy(result['asset_robot']),
             'mesh_sha256': digest, 'T_world_receiver_retarget': shift.tolist(),
-            'receiver_policy': 'Rigidly retargeted with the object at the planned endpoint',
+            'receiver_policy': 'fixed_world' if fixed else 'Rigidly retargeted with the object at the planned endpoint',
             'original_experiment': deepcopy(result.get('experiment')),
         }
         if 'experiment' in result:
             result['experiment']['receiver_policy'] = result['asset_preparation']['receiver_policy']
-            result['experiment']['paired_receiver_preserved'] = False
+            result['experiment']['paired_receiver_preserved'] = fixed
     result['asset_contact_fit'] = fit
+    if fit['status'] == 'bilateral_surface_fit':
+        result.setdefault('gripper_opening_m',fit['width_m'])
+        result.setdefault('gripper_opening_source','original_mesh_pad_contact')
     return result, opening

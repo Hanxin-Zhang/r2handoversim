@@ -10,16 +10,25 @@ reproduction of the benchmark baseline's Table I run.
 
 | Detail | Implementation | Fidelity boundary |
 |---|---|---|
-| Object fixed relative to end effector; no tabletop pickup | `T_object_gripper` and rigid attachment during replay | Same protocol idea; proxy object geometry |
-| Static receiver per trial | Fixed world hand boxes or supplied mesh | No original random hand-pose dataset |
+| Object fixed relative to end effector; no tabletop pickup | `T_object_gripper` and rigid attachment during replay | Original meshes in asset workflow; proxy fixtures also retained |
+| Static receiver per trial | Seeded fixed-world left/right hand meshes, passed to method before selection | Local templates, not original 400 interaction sequences |
 | Full pose numerical IK, then RRT-Connect | `planning.solve_pose`, `rrt_connect` | SciPy numerical Jacobian + portable NumPy search; not MoveIt |
-| Plan, Eq. (1) | New planner plus independent path/endpoint recheck | Box collisions and sampled edges, not robot CAD/MANO mesh planning |
-| Reach, Eq. (2) | Object intersects sphere at palm + 0.12 m normal, radius 0.10 m | Exact sphere/box test for object proxy union |
-| Stability, Eq. (3) | Closing-axis projected width <= 0.085 m | Matches stated width predicate, not frictional force closure |
-| Affordance, Eq. (4) | Finger volume avoids intended region; omitted in S0 | Oriented box geometry |
-| Safe, Eq. (5) | PhysX robot-box overlap every executed frame | Optional static hand triangle mesh; robot remains box proxies |
+| Plan, Eq. (1) | PhysX original USD/object hull/MANO triangle queries in fixed-receiver workflow | Numerical IK + RRT-Connect, not MoveIt; proxy planner also retained |
+| Reach, Eq. (2) | Object intersects sphere at palm + 0.12 m normal, radius 0.10 m | Original convex hull in asset workflow; proxy union otherwise |
+| Stability, Eq. (3) | Full object mesh closing-axis projection <= 0.085 m; fail before planning | Explicit operational width definition, separate from fitted pad aperture |
+| Affordance, Eq. (4) | Actual USD finger/usage-region overlap; omitted in S0 | Usage regions remain supplied box approximations |
+| Safe, Eq. (5) | Original USD arm/gripper colliders versus static hand triangles each frame | Kinematic replay and geometric contact; no grasp-force simulation |
 | Failure attribution, Eq. (6) and following text | Stability → Plan → Reach → Affordance → Safe | All flags retained for diagnosis; first failure alone contributes to rates |
 | Table I averaging | `aggregation.table_rows` | Applied to release examples, never copied paper numbers |
+
+## Original-asset fixed receiver workflow
+
+The table above distinguishes the portable proxy and original-asset workflows. The
+[fixed-world receiver workflow](fixed_receivers.md) adds original USD collision
+planning, original object hull Reach, actual finger-region queries and static
+left/right hand meshes. It supersedes the proxy geometry limitations when that
+workflow is used. It does not recover the paper's original sampling dataset,
+MoveIt implementation or original baseline runs.
 
 ## Plan an actual target pose
 
@@ -101,10 +110,11 @@ so these clock choices are explicit release conventions, not numerical parity.
 `summary.json` retains pooled trial-weighted summaries for backward compatibility;
 it can differ from `paper_table.json` when object trial counts differ.
 
-Still absent: original 16 OakInk meshes and splits, 400 curated interactions,
-top-100 Multi-GraspLLM candidates, MoveIt/URDF robot collision geometry, original
-baseline models, hardware trials and participant ratings. The three procedural
-objects and illustrative split assignments are clearly separate from that data.
+Still absent: the original 400 curated interactions, exact top-100
+Multi-GraspLLM subset/ranking, original semantic masks, MoveIt backend, original
+baseline models, hardware trials and participant ratings. The local 16 original
+object meshes and original USD robot geometry are now connected in the asset
+workflow; the three procedural objects remain separate installation examples.
 
 ## Local data now connected (0.4.0)
 

@@ -189,3 +189,42 @@ These are release functionality checks. The 16 generated scenes use authored
 hand proxies and geometric approaches, not original baseline predictions or
 paper success-rate experiments. The 73-second review montage contains actual
 Isaac Sim viewport captures with object/setting/outcome labels.
+
+## 0.10.0 fixed-world hand and method integration
+
+Original UR5e/Robotiq USD, original OBJ objects and visible left/right MANO meshes
+were used in the live Isaac Sim tests. Each object's four bounded SE(3) samples
+(seed 27) were fixed before FS/A1/A2/A3 selection. The method used the explicit
+`object_projection` feasibility policy; the local pad aperture was preserved
+separately. Numerical records and method post-audits both passed.
+
+| Local setting | FS | A1 | A2 | A3 | Recorded frames |
+|---|---:|---:|---:|---:|---:|
+| Can, S0, successes / 4 trials | 3 | 1 | 4 | 4 | 1,582 |
+| Screwdriver, authored S1, successes / 4 trials | 4 | 0 | 4 | 4 | 2,518 |
+
+Can failures were Plan failures. Screwdriver A1 failed Plan twice and Affordance
+twice. All 32 resolved trials preserved selected grasp, local opening, receiver,
+object target and full-projection width. These small local samples are **not**
+paper success-rate replications; the original 400 interactions, paper top-100
+subset and semantic masks remain unrecovered.
+
+A separate original-weight Text2HOI 1000-step → MANO → selection → authored
+skeletal delivery route reached the benchmark. Its one trial failed Plan with
+eight IK solutions and collision rejections (object/hand, self and environment).
+The predicted hand and original delivery target were kept; the failure was not
+retargeted into a success. A separate live-USD positive control placed a small
+usage region on a finger-pad contact: only Affordance failed, confirming the
+query can detect intrusion. These two runs are not pooled into the table above.
+
+The new handover camera chooses a receiver view using original USD world bounds
+at the start, middle and end of the saved trajectory. A formerly occluded S1
+pose was rechecked visually with the hand and both grasping geometry and robot
+visible. Camera-only recordings retain the original numeric trials, avoiding
+changes to receiver poses or measured outcomes to improve a movie.
+
+The neutral hand exporter was tested without importing the companion repository;
+its 778-vertex/1,538-face left/right rest templates matched the locally decoded
+zero-pose templates within 2e-8 m. Model files and generated meshes remain local.
+Per-trial results, frame counts and scene poses are in
+[fixed_receiver_validation.json](fixed_receiver_validation.json).

@@ -113,6 +113,8 @@ def rrt_connect(start, goal, clear, rng, iterations=600, step=.25, resolution=.0
 
 def plan_trial(trial, seed=0, iterations=600, max_joint_speed=.6, resolution=.06):
     """Returns an auditable failed trial if IK or search fails; no invented path."""
+    if trial.get('receiver_protocol',{}).get('planner')=='isaacsim_physx_rrt_connect':
+        raise ValueError('Fixed receiver mesh scenes must be planned by demo in Isaac Sim, not the proxy planner')
     validate_trial(trial)
     if iterations < 1 or not np.isfinite([max_joint_speed, resolution]).all() or max_joint_speed <= 0 or resolution <= 0:
         raise ValueError("Planner iteration count, speed and resolution must be positive")

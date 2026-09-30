@@ -1,5 +1,10 @@
 # Replay locally configured objects
 
+This page describes the original point-cloud importer. Original OBJ meshes and
+preselection candidate/receiver scenes now use the
+[fixed receiver workflow](fixed_receivers.md); that workflow enables original
+collider planning and hull-based metrics.
+
 The companion method reads the original Text2HOI YAML config and emits a
 `handover.dataset.v1` manifest. This benchmark consumes those exported JSON
 files; it neither imports the companion Python package nor loads the legacy

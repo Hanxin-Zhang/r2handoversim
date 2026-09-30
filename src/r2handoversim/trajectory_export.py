@@ -24,7 +24,12 @@ def export(trial, contacts, output, observed_tool_poses=None):
     scene = output / f"{trial['id']}_trial.json"
     trajectory = output / f"{trial['id']}_trajectory.npz"
     scene.write_text(json.dumps(trial, allow_nan=False))
-    np.savez_compressed(trajectory, schema_version='handover.trajectory.v1',
+    receiver = trial.get('receiver')
+    extra = {} if receiver is None else dict(
+        receiver_id=receiver['id'], receiver_side=receiver['side'], receiver_seed=receiver['seed'],
+        T_world_hand=np.repeat(np.asarray(receiver['T_world_hand'])[None],len(q),axis=0),
+        palm_position_world=np.repeat(np.asarray(trial['palm_position_world'])[None],len(q),axis=0))
+    np.savez_compressed(trajectory, **extra, schema_version='handover.trajectory.v1',
         pose_source='USD tool observations' if observed_tool_poses is not None else 'nominal kinematics',
         time_s=np.arange(len(q))*trial['dt_s'], joint_position_rad=q,
         T_world_tool=observed, T_world_object=objects,

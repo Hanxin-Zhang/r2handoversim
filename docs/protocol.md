@@ -104,3 +104,16 @@ USD Points display/animation. `object_boxes` remains the metric/collision proxy.
 `source_data` and `annotation_status` survive conversion into results. `--trials`
 accepts a nonempty JSON array of complete trial objects; `from-dataset` creates
 such a batch from the companion import manifest. See [dataset.md](dataset.md).
+
+## Fixed-world original assets (0.10.0)
+
+`receiver` records static world hand pose, side, seed, source mesh hash and
+sample index. `receiver_protocol.policy=fixed_world` preserves that scene;
+`replan_in_isaac=true` defers planning to the live original-collider backend.
+`target_T_world_object` is shared across modes. `method_selection` and
+`grasp_contract` preserve the selected pose and local opening, while
+`stability_width_m` stores the separate full-mesh closing-axis projection.
+Changing a fixed scene's target via a delivery input is rejected. Candidate
+asset fitting is performed before selection via `prepare-candidates`, with
+failed candidates retained. See [fixed receivers](fixed_receivers.md) for input
+schemas, operation order, sampling definitions and remaining paper gaps.

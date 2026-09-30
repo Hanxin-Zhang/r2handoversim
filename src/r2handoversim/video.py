@@ -47,3 +47,39 @@ def encode_frames(directory, destination, count, dt_s, speed=1.):
         raise RuntimeError("Video encoding timed out after 180 seconds") from exc
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def review_montage(directory, destination):
+    """Caption recorded clips with their own scene IDs and measured outcomes."""
+    import json
+    import tempfile
+    from .verification import verify_output
+    root=Path(directory).resolve();destination=Path(destination).resolve()
+    verify_output(root)
+    rows=json.loads((root/'results.json').read_text())
+    destination.parent.mkdir(parents=True,exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='r2-review-') as tmp:
+        tmp=Path(tmp);clips=[]
+        for i,row in enumerate(rows):
+            if 'video' not in row['artifacts']: raise ValueError('Every montage trial needs a recorded video')
+            trial=json.loads((root/row['artifacts']['trial']).read_text())
+            receiver=trial.get('receiver',{})
+            caption=f"REPLAY | {row['trial_id']}\n"
+            policy=trial.get('grasp_contract',{}).get('feasibility_width_policy','opening') if 'method_selection' in trial else 'geometry demo'
+            caption+=f"Receiver: {receiver.get('side','provided')} | seed {receiver.get('seed','n/a')} | {trial['split']} | {policy} | "
+            caption+=f"{row['first_failure']+' failure' if row['first_failure'] else 'success'}\n"
+            caption+='  '.join(f'{key}: {"n/a" if value is None else "pass" if value else "fail"}' for key,value in row['metrics'].items())
+            textfile=tmp/f'{i}.txt';textfile.write_text(caption)
+            clip=tmp/f'{i}.mp4';clips.append(clip)
+            subprocess.run([require_encoder(),'-hide_banner','-loglevel','error','-y',
+                '-i',str(root/row['artifacts']['video']),'-vf',
+                f'drawbox=x=0:y=0:w=iw:h=112:color=black@0.72:t=fill,drawtext=textfile={textfile}:expansion=none:fontcolor=white:fontsize=23:x=18:y=12:line_spacing=8',
+                '-an','-c:v','libx264','-preset','fast','-crf','18','-pix_fmt','yuv420p',str(clip)],check=True,capture_output=True,timeout=180)
+        manifest=tmp/'clips.txt';manifest.write_text(''.join(f"file '{clip}'\n" for clip in clips))
+        partial=destination.with_suffix('.partial.mp4')
+        try:
+            subprocess.run([require_encoder(),'-hide_banner','-loglevel','error','-y','-f','concat','-safe','0',
+                '-i',str(manifest),'-c','copy','-movflags','+faststart',str(partial)],check=True,capture_output=True,timeout=180)
+            partial.replace(destination)
+        finally: partial.unlink(missing_ok=True)
+    return destination

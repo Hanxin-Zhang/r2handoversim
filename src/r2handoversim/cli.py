@@ -12,6 +12,25 @@ def main(argv=None):
     from . import __version__
     parser.add_argument('--version', action='version', version=f'r2handoversim {__version__}')
     sub = parser.add_subparsers(dest="command", required=True)
+    review = sub.add_parser('review-video',help='Caption verified Isaac recordings with receiver IDs and measured results')
+    review.add_argument('--input',type=Path,required=True)
+    review.add_argument('--output',type=Path,required=True)
+    candidates = sub.add_parser('prepare-candidates', help='Fit all method candidates to original USD pads before selection (Isaac Sim Python)')
+    candidates.add_argument('--scene',type=Path,required=True)
+    candidates.add_argument('--asset-config',type=Path,required=True)
+    candidates.add_argument('--output',type=Path,required=True)
+    receivers = sub.add_parser('sample-receivers',help='Assign seeded, fixed-world receiving hand mesh poses to local-asset trials')
+    receivers.add_argument('--trials',type=Path,required=True)
+    receivers.add_argument('--receiver-config',type=Path,required=True)
+    receivers.add_argument('--samples',type=int,default=4)
+    receivers.add_argument('--seed',type=int,default=0)
+    receivers.add_argument('--output',type=Path,default=Path('outputs/receiver_trials'))
+    scenes = sub.add_parser('receiver-scenes',help='Generate fixed-world hand scenes for method selection before replay')
+    scenes.add_argument('--scene',type=Path,required=True)
+    scenes.add_argument('--receiver-config',type=Path,required=True)
+    scenes.add_argument('--samples',type=int,default=4)
+    scenes.add_argument('--seed',type=int,default=0)
+    scenes.add_argument('--output',type=Path,default=Path('outputs/receiver_scenes'))
     doctor = sub.add_parser('doctor', help='Check this Python environment and optional assets without starting Kit')
     doctor.add_argument('--isaac', action='store_true', help='Require Isaac Sim to be installed')
     doctor.add_argument('--video', action='store_true', help='Require an H.264 ffmpeg encoder')
@@ -75,6 +94,25 @@ def main(argv=None):
     dataset.add_argument("--output", type=Path, default=Path("outputs/dataset_trials"))
     args = parser.parse_args(argv)
     try:
+        if args.command == 'review-video':
+            from .video import review_montage
+            print(review_montage(args.input,args.output))
+            return
+        if args.command == 'receiver-scenes':
+            from .receivers import scene_batch
+            manifest=scene_batch(args.scene,args.receiver_config,args.output,args.samples,args.seed)
+            print(f"Prepared {len(manifest['scenes'])} receiver scenes for method selection: {(args.output/'scenes.json').resolve()}")
+            return
+        if args.command == 'prepare-candidates':
+            from .candidate_calibration import export
+            status=export(args.scene,args.asset_config,args.output)
+            print(f"Calibrated {status['contact_valid']}/{status['candidates']} candidates; all IDs retained: {args.output.resolve()}")
+            return
+        if args.command == 'sample-receivers':
+            from .receivers import generate
+            trials=generate(json.loads(args.trials.read_text()),args.receiver_config,args.output,args.samples,args.seed)
+            print(f"Generated {len(trials)} fixed-receiver trials: {(args.output/'trials.json').resolve()}")
+            return
         if args.command == 'verify-output':
             from .verification import verify_output
             report = verify_output(args.input)
@@ -152,11 +190,16 @@ def main(argv=None):
             return
         if args.command in ("from-intent", "plan"):
             if args.command == "from-intent":
-                trial = from_selection(json.loads(args.scene.read_text()), json.loads(args.selection.read_text()),
+                selection=json.loads(args.selection.read_text())
+                trial = from_selection(json.loads(args.scene.read_text()), selection,
+                    variant=selection.get('mode') or 'intent_aware',
                     delivery=json.loads(args.delivery.read_text()) if args.delivery else None)
+                if 'receiver' in trial: trial['id'] += '_' + trial['receiver']['id']
+                if trial.get('receiver_protocol',{}).get('replan_in_isaac'):
+                    trial['receiver_protocol']['planning_seed']=args.seed
             else:
                 trial = json.loads(args.trial.read_text())
-            if args.command == "plan" or args.delivery:
+            if args.command == "plan" or (args.delivery and not trial.get('receiver_protocol',{}).get('replan_in_isaac')):
                 from .planning import plan_trial
                 trial = plan_trial(trial, seed=args.seed, iterations=getattr(args, "iterations", 600))
             validate_trial(trial)

@@ -1,5 +1,9 @@
 # R2HandoverSim
 
+For original robot/object assets and visible random left/right receiving hands,
+see [fixed-world receiver replay](docs/fixed_receivers.md). This workflow samples
+hands before method selection and records the fixed hand pose with every trace.
+
 **Isaac Sim handover demos with offline method outputs and reproducible result files.**
 
 The bundled fixtures contain three objects (hammer, screwdriver, bottle) and
@@ -98,8 +102,8 @@ This workflow needs no method checkout, model weights or dataset manifest. It
 chooses a geometric approach, a static hand proxy and an authored 90-frame
 trajectory. Its S0 metrics use object bounding boxes. Failed fits stop with an
 error; outputs are replay examples, not baseline predictions. If you already
-have a method trial, pass `--trial trial.json --asset-config outputs/local_assets.json`
-directly to `demo` instead.
+have method candidates, use [preselection asset calibration and fixed receivers](docs/fixed_receivers.md)
+before selecting and converting a trial. Unprepared method selections are rejected.
 
 The adapter uses the `danilab_ur5e` assembly's six UR5e joint names and Robotiq
 finger links, including its joint-frame transforms, original meshes, materials,
@@ -128,7 +132,7 @@ with `--hand-collision mesh`.
 ## Resolved scenes and trajectory records
 
 Every Isaac Sim run exports `*_trial.json` with the scene actually replayed,
-including the fitted grasp, calibrated tool offset and retargeted receiver.
+including the grasp, calibrated tool offset and receiver world geometry.
 Load this file directly to repeat the same scene:
 
 ```bash
@@ -160,12 +164,12 @@ This checks completion counts, artifact presence, timestamps, joints, poses,
 collision observations and evaluated outcomes against the resolved scene.
 It does not turn replay observations into original paper measurements.
 
-Receiver retargeting also updates the skeleton, hand center, facing direction
-and delivery annotations. Its transform and the pre-calibration delivery/plan
-are retained. This asset adapter changes the receiver per trial; a converted
-paired experiment is explicitly marked `paired_receiver_preserved: false`.
-Use these outputs for replay review, not as an unchanged fixed-receiver
-comparison across methods.
+Legacy authored demos retarget the receiver during asset fitting and record that
+transform. The fixed-world receiver workflow preserves the hand and object
+target, calibrates all candidates before method selection, and plans with the
+actual colliders. Only the latter supports unchanged receiver comparisons
+across methods. Its NPZ also records `T_world_hand`, palm position, receiver ID,
+side and seed; `review-video` adds matching outcome captions.
 
 ## Paper replay
 
@@ -204,10 +208,10 @@ recorded in the fixtures and result files.
 
 | Metric | This release |
 |---|---|
-| Stability | Projected object-proxy width ≤ 85 mm; the object is then replayed rigidly with the gripper |
-| Plan | Stored traces: joint limits, endpoint and sampled hand clearance. New planner: full pose IK plus RRT-Connect with robot/object/hand/obstacle box checks |
-| Reach | Delivered object boxes intersect the palm-normal sphere (12 cm offset, 10 cm radius) |
-| Affordance | Finger proxies do not intersect the intended region; omitted in S0 |
+| Stability | Fixed-receiver assets: full object mesh projection ≤ 85 mm, separate from pad aperture; proxy fixtures retain their width rule |
+| Plan | Fixed-receiver assets: full pose IK + RRT-Connect with original USD/object hull/hand triangle PhysX queries; portable proxy planner also available |
+| Reach | Delivered object hull (asset workflow) or boxes intersects the palm-normal sphere (12 cm offset, 10 cm radius) |
+| Affordance | Original USD fingers versus supplied usage-region boxes with assets; finger proxies otherwise; omitted in S0 |
 | Safe | No hand overlap at replay frames: proxy boxes by default, original robot colliders with local assets; optional triangle-mesh hand collider |
 
 First-failure attribution follows **Stability → Plan → Reach → Affordance → Safe**.
@@ -218,7 +222,8 @@ the result for diagnosis, even when an earlier criterion fails.
 Stored traces retain the original lightweight Plan check. The new `plan`
 command performs full-pose numerical IK and RRT-Connect, with attached-object,
 hand, table/obstacle and nonadjacent arm-proxy checks. It is a portable release
-implementation, not MoveIt or a CAD-accurate collision model. Safety is sampled,
+implementation. Fixed-receiver mesh trials instead plan inside `demo` using
+original USD colliders and PhysX. Neither implementation is MoveIt. Safety is sampled,
 not continuous collision detection. Scene visuals and box queries are kinematic
 replay, not an articulated torque simulation. No frictional grasp stability is
 claimed. Planning time is measured for newly planned trials and remains null for stored
@@ -254,7 +259,8 @@ If the method scene was produced with `from-prediction`, conversion preserves
 the predicted palm normal and carries the decoded MANO mesh into Isaac Sim for
 display. Add `--hand-collision mesh` to use its triangles for PhysX safety
 queries. Without this flag, collision evaluation uses the skeletal box proxies.
-The CPU planner/evaluator continues to use boxes in both cases. MANO-derived outputs remain local/generated assets
+The portable CPU planner uses boxes; the fixed-receiver workflow uses live PhysX
+mesh queries and exports verifiable observations for offline checks. MANO-derived outputs remain local/generated assets
 and are not bundled in the repository.
 
 ## Complete method runs and paired ablations

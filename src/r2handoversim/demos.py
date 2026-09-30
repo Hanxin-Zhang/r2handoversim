@@ -25,6 +25,9 @@ def from_selection(scene, selection, steps=90, variant="intent_aware", delivery=
         raise ValueError("Scene and selection object ids differ")
     grasp = transform(selection["selected"]["T_object_gripper"])
     goal = tcp(GOAL)
+    fixed_scene = scene.get('receiver_protocol',{}).get('policy') == 'fixed_world'
+    if fixed_scene:
+        goal = transform(scene['target_T_world_object']) @ grasp
     if delivery is not None:
         if (delivery.get("schema_version") != "handover.delivery.v1" or delivery.get("units") != "m"
                 or delivery["object_id"] != scene["object"]["id"]
@@ -33,6 +36,8 @@ def from_selection(scene, selection, steps=90, variant="intent_aware", delivery=
         goal = transform(delivery["T_world_gripper"])
         if not np.allclose(goal@inverse(grasp), transform(delivery["T_world_object"]), atol=1e-6):
             raise ValueError("Delivery object and gripper transforms are inconsistent")
+        if fixed_scene and not np.allclose(delivery['T_world_object'],scene['target_T_world_object'],atol=1e-9):
+            raise ValueError('Delivery cannot change a fixed receiver scene object target')
     world_object = goal @ inverse(grasp)
     region = scene["intent"]["human_region"]
     # Receiving hand in object coordinates; bundled demos use procedural proxies.
@@ -58,8 +63,30 @@ def from_selection(scene, selection, steps=90, variant="intent_aware", delivery=
             "usage_boxes": deepcopy(scene["object"]["usage_regions"][region]),
             "hand_boxes_world": hand_boxes, "palm_position_world": palm_world.tolist(),
             "palm_normal_world": normal_world.tolist(), "reach_offset_m": .12,
-            "reach_radius_m": .10, "max_opening_m": .085, "dt_s": 1/60,
+            "reach_radius_m": .10, "max_opening_m": scene.get('gripper', {}).get('max_opening_m', .085), "dt_s": 1/60,
             "planned_joints": planned, "executed_joints": executed}
+    if 'evaluation_split_provenance' in scene:
+        trial['evaluation_split_provenance']=deepcopy(scene['evaluation_split_provenance'])
+    if 'grasp_contract' in selection:
+        trial['grasp_contract'] = deepcopy(selection['grasp_contract'])
+        trial['method_selection'] = {**deepcopy(selection['selected']), 'mode': selection.get('mode')}
+        trial['gripper_opening_m'] = float(selection['selected']['width_m'])
+        trial['gripper_opening_source'] = selection['selected'].get('width_source', 'method_selection')
+    if 'mesh' in scene['object']:
+        mesh = deepcopy(scene['object']['mesh'])
+        mesh.setdefault('colors', [[.72,.78,.82]] * len(mesh['vertices']))
+        trial['object_mesh_object'] = mesh
+        if 'geometry_contract' in scene.get('gripper',{}):
+            trial['asset_robot'] = deepcopy(scene['gripper']['geometry_contract']['robot'])
+    if 'receiver' in scene:
+        trial['receiver'] = deepcopy(scene['receiver'])
+    if fixed_scene:
+        trial['receiver_protocol'] = deepcopy(scene['receiver_protocol'])
+        trial['target_T_world_object'] = deepcopy(scene['target_T_world_object'])
+        trial['planned_joints'] = [HOME.tolist()]
+        trial['executed_joints'] = [HOME.tolist()]
+        if 'geometry_contract' in scene.get('gripper',{}):
+            trial['asset_robot'] = deepcopy(scene['gripper']['geometry_contract']['robot'])
     if "surface_points" in scene["object"]:
         trial["object_points_object"] = deepcopy(scene["object"]["surface_points"])
         trial["source_data"] = deepcopy(scene.get("source_data", {}))
@@ -73,4 +100,12 @@ def from_selection(scene, selection, steps=90, variant="intent_aware", delivery=
         trial["planned_joints"] = [HOME.tolist()]
         trial["executed_joints"] = [HOME.tolist()]
         trial["delivery"] = deepcopy(delivery)
+        if not fixed_scene:
+            trial['receiver_protocol'] = {'policy':'fixed_world', 'replan_in_isaac':False}
+        trial['target_T_world_object'] = deepcopy(delivery['T_world_object'])
+        if 'asset_robot' in trial and 'hand_mesh_world' not in trial:
+            raise ValueError('Original-asset delivery requires receiving_hand.mesh; use receiver-scenes or a decoded MANO scene')
+        if 'asset_robot' in trial and 'hand_mesh_world' in trial:
+            trial['receiver_protocol'].update(replan_in_isaac=True,hand_collision='mesh',
+                object_collision='convexHull',planner='isaacsim_physx_rrt_connect')
     return trial

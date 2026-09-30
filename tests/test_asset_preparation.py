@@ -63,3 +63,20 @@ class PreparationTests(unittest.TestCase):
             resolved,_=prepare(t,Robot())
             self.assertEqual(fit.call_count,1)
             self.assertEqual(resolved['asset_contact_fit']['status'],'bilateral_surface_fit')
+
+    def test_fixed_receiver_is_never_retargeted_during_asset_preparation(self):
+        t=self.source();t['receiver_protocol']={'policy':'fixed_world'}
+        t['target_T_world_object']=np.eye(4).tolist()
+        before=deepcopy(t)
+        with patch('r2handoversim.grasp_fit.fit_grasp',side_effect=fitted):
+            resolved,_=prepare(t,Robot())
+        for key in ('hand_boxes_world','palm_position_world','palm_normal_world','target_T_world_object'):
+            self.assertEqual(resolved[key],before[key])
+        self.assertEqual(resolved['asset_preparation']['receiver_policy'],'fixed_world')
+        np.testing.assert_allclose(resolved['target_T_world_gripper'],resolved['T_object_gripper'])
+
+    def test_unprepared_method_candidate_is_not_refitted(self):
+        t=self.source();t['method_selection']={'id':'g'}
+        with patch('r2handoversim.grasp_fit.fit_grasp') as fit:
+            with self.assertRaisesRegex(ValueError,'prepare-candidates'): prepare(t,Robot())
+        fit.assert_not_called()

@@ -21,8 +21,12 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     results = []
+    requested_hand_collision = hand_collision
     def save_run(status, error=None):
+        from . import __version__
         (output / "run.json").write_text(json.dumps({"status": status, "run_id": run_id,
+            "package_version": __version__, "camera": camera, "video": video,
+            "requested_hand_collision": requested_hand_collision, "headless": headless,
             "expected_trials": len(trials), "completed_trials": len(results),
             "error": error}, indent=2))
     save_run("starting")
@@ -40,7 +44,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
     try:
         from isaacsim.core.api import World
         from isaacsim.core.utils.viewports import set_camera_view
-        from pxr import Gf, UsdGeom, UsdLux, UsdPhysics, PhysicsSchemaTools
+        from pxr import Gf, Usd, UsdGeom, UsdLux, UsdPhysics, PhysicsSchemaTools
         from omni.physx import get_physx_scene_query_interface
         import carb
         world = World(stage_units_in_meters=1., physics_dt=1/60, rendering_dt=1/60)
@@ -99,9 +103,11 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
 
         draw_box("/World/Table", box([-.35, 0, .70], [.65, .55, .035]), [.24, .29, .36], collider=True)
         save_run("running")
+        requested_hand_collision = hand_collision
         for trial in trials:
             from copy import deepcopy
             trial = deepcopy(trial)
+            hand_collision = trial.get('receiver_protocol',{}).get('hand_collision',requested_hand_collision)
             world.stop()
             if stage.GetPrimAtPath("/World/Trial"):
                 stage.RemovePrim("/World/Trial")
@@ -117,11 +123,25 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 from .asset_preparation import prepare
                 trial, opening = prepare(trial, asset_robot)
                 UsdGeom.Imageable(stage.GetPrimAtPath('/World/Table')).MakeInvisible()
+                UsdPhysics.CollisionAPI(stage.GetPrimAtPath('/World/Table')).GetCollisionEnabledAttr().Set(False)
             else:
                 UsdGeom.Imageable(stage.GetPrimAtPath('/World/Table')).MakeVisible()
+                UsdPhysics.CollisionAPI(stage.GetPrimAtPath('/World/Table')).GetCollisionEnabledAttr().Set(True)
+            camera_record={"mode":camera}
             if camera == "handover":
-                target = .8*trial_tcp(trial, trial["planned_joints"][-1])[:3,3] + .2*np.asarray(trial["palm_position_world"])
-                set_camera_view(eye=target+np.array([.48, -.65, .38]), target=target)
+                if ('hand_mesh_world' in trial and 'object_mesh_object' in trial
+                        and trial.get('receiver_protocol',{}).get('policy')=='fixed_world'):
+                    hand_points = np.asarray(trial['hand_mesh_world']['vertices'])
+                    target_object = transform(trial['target_T_world_gripper']) @ inverse(trial['T_object_gripper'])
+                    mesh_points = np.asarray(trial['object_mesh_object']['vertices'])
+                    object_points = mesh_points@target_object[:3,:3].T+target_object[:3,3]
+                    all_points = np.vstack([hand_points,object_points,transform(trial['target_T_world_gripper'])[:3,3]])
+                    target = (all_points.min(0)+all_points.max(0))/2
+                    scale = max(1.,np.linalg.norm(np.ptp(all_points,axis=0))/.45)
+                    set_camera_view(eye=target+scale*np.array([.6,-.9,.6]),target=target)
+                else:
+                    target = .8*trial_tcp(trial, trial["planned_joints"][-1])[:3,3] + .2*np.asarray(trial["palm_position_world"])
+                    set_camera_view(eye=target+np.array([.48, -.65, .38]), target=target)
             frame_directory = output / f"{trial['id']}_frames"
             if video:
                 # A fresh directory prevents stale frames entering a rerun.
@@ -156,7 +176,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 mesh.CreateFaceVertexCountsAttr([3] * len(data["faces"]))
                 mesh.CreateFaceVertexIndicesAttr(np.asarray(data["faces"]).reshape(-1).tolist())
                 mesh.CreateSubdivisionSchemeAttr("none")
-                mesh.CreateDisplayColorAttr([Gf.Vec3f(1., .64, .31)])
+                mesh.CreateDisplayColorAttr([Gf.Vec3f(.95, .70, .52)])
                 if hand_collision == "mesh":
                     UsdPhysics.CollisionAPI.Apply(mesh.GetPrim())
                     UsdPhysics.MeshCollisionAPI.Apply(mesh.GetPrim()).CreateApproximationAttr("none")
@@ -182,6 +202,9 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 mesh.GetDisplayColorPrimvar().SetInterpolation('vertex')
                 point_op = UsdGeom.Xformable(mesh.GetPrim()).AddTransformOp()
                 point_op.Set(Gf.Matrix4d(*(trial_tcp(trial,q0)@grasp_inverse).T.reshape(-1).tolist()))
+                if trial.get('receiver_protocol',{}).get('object_collision') == 'convexHull':
+                    UsdPhysics.CollisionAPI.Apply(mesh.GetPrim())
+                    UsdPhysics.MeshCollisionAPI.Apply(mesh.GetPrim()).CreateApproximationAttr('convexHull')
             elif "object_points_object" in trial:
                 for i in range(len(object_ops)):
                     UsdGeom.Imageable(stage.GetPrimAtPath(f"/World/Trial/Object/part_{i}")).MakeInvisible()
@@ -214,6 +237,89 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 for _ in range(8):
                     world.render()
             query = get_physx_scene_query_interface()
+            if trial.get('receiver_protocol',{}).get('policy')=='fixed_world' and hand_collision=='mesh':
+                hand_vertices=np.asarray(trial['hand_mesh_world']['vertices'])
+                # Positive control: the live query pipeline must see the hand collider.
+                seen=[]
+                def hand_probe(hit):
+                    if str(hit.collision)=='/World/Trial/Hand/mesh': seen.append(True)
+                    return True
+                center=(hand_vertices.min(0)+hand_vertices.max(0))/2
+                extents=(hand_vertices.max(0)-hand_vertices.min(0))/2+.002
+                query.overlap_box(carb.Float3(*extents),carb.Float3(*center),carb.Float4(0,0,0,1),hand_probe,False)
+                if not seen: raise RuntimeError('PhysX positive control did not detect the receiver mesh')
+                trial['receiver_protocol']['live_hand_collider_verified']=True
+            if trial.get('receiver_protocol',{}).get('replan_in_isaac'):
+                if not asset_robot or hand_collision != 'mesh' or point_op is None:
+                    raise ValueError('Fixed-receiver mesh planning requires original robot/object and receiving-hand mesh')
+                from .physx_planning import plan as plan_mesh, forbidden, link_group
+                def collision_clear(q):
+                    if np.any(np.abs(q)>2*np.pi): return False,'joint_limits'
+                    asset_robot.update(q,opening)
+                    point_op.Set(Gf.Matrix4d(*(trial_tcp(trial,q)@grasp_inverse).T.reshape(-1).tolist()))
+                    world.step(render=False)
+                    for path in [*asset_robot.colliders,stage.GetPrimAtPath('/World/Trial/ObjectMesh').GetPath()]:
+                        source_group=link_group(path); hits=[]
+                        def callback(hit):
+                            other_group=link_group(hit.collision)
+                            if str(hit.collision)!=str(path) and forbidden(source_group,other_group):
+                                hits.append(f'{source_group}:{other_group}')
+                            return True
+                        a,b=PhysicsSchemaTools.encodeSdfPath(path)
+                        query.overlap_shape(a,b,callback,False)
+                        if hits: return False,hits[0]
+                    return True,None
+                verts=np.asarray(trial['object_mesh_object']['vertices'])
+                trial['stability_width_m']=float(np.ptp(verts@transform(trial['T_object_gripper'])[:3,1]))
+                trial['stability_width_rule']='Full object mesh projection along closing axis (Eq. 3)'
+                trial=plan_mesh(trial,collision_clear,iterations=trial['receiver_protocol'].get('iterations',200))
+                trial['receiver_protocol']['replan_in_isaac']=False
+                q0=trial['executed_joints'][0]
+                asset_robot.update(q0,opening)
+                point_op.Set(Gf.Matrix4d(*(trial_tcp(trial,q0)@grasp_inverse).T.reshape(-1).tolist()))
+                world.step(render=True)
+                print(f"{trial['id']}: plan {trial['planning']['status']}, {trial['planning']['checked_configurations']} checked states, {trial['planning']['rejected_contacts']}",flush=True)
+            if (camera=='handover' and asset_robot and 'hand_mesh_world' in trial
+                    and trial.get('receiver_protocol',{}).get('policy')=='fixed_world'):
+                from .camera import choose
+                # Preview the saved trajectory without changing any of its geometry.
+                path=trial['executed_joints'];bounds_by_pose=[]
+                meshes=[p for p in Usd.PrimRange(asset_robot.root) if p.GetTypeName()=='Mesh']
+                for index in sorted({0,len(path)//2,len(path)-1}):
+                    q=path[index];asset_robot.update(q,opening)
+                    point_op.Set(Gf.Matrix4d(*(trial_tcp(trial,q)@grasp_inverse).T.reshape(-1).tolist()))
+                    world.step(render=False)
+                    cache=UsdGeom.BBoxCache(Usd.TimeCode.Default(),['default','render','proxy'],False,True)
+                    bounds=[]
+                    for prim in [*meshes,stage.GetPrimAtPath('/World/Trial/ObjectMesh')]:
+                        extent=cache.ComputeWorldBound(prim).ComputeAlignedRange()
+                        if not extent.IsEmpty(): bounds.append([list(extent.GetMin()),list(extent.GetMax())])
+                    bounds_by_pose.append(bounds)
+                eye,diagnostic=choose(trial['hand_mesh_world']['vertices'],target,bounds_by_pose,scale)
+                camera_record.update(eye_world=eye.tolist(),target_world=target.tolist(),**diagnostic)
+                set_camera_view(eye=eye,target=target)
+                asset_robot.update(q0,opening)
+                point_op.Set(Gf.Matrix4d(*(trial_tcp(trial,q0)@grasp_inverse).T.reshape(-1).tolist()))
+                world.step(render=True)
+                for _ in range(2): world.render()
+            if asset_robot and trial['split']=='S1':
+                # Query the real finger collider against the supplied semantic region volumes.
+                # Regions are not physical obstacles; this cannot affect motion planning.
+                from .mesh_metrics import affordance_digest
+                object_pose=trial_tcp(trial,q0)@grasp_inverse
+                usage_hits=[]
+                def hit_usage(hit):
+                    path=str(hit.collision)
+                    if '/World/AssetRobot/robotiq_85_' in path and 'finger' in path:
+                        usage_hits.append(path)
+                    return True
+                for region in trial['usage_boxes']:
+                    region=moved(region,object_pose)
+                    query.overlap_box(carb.Float3(*region['half_extents']),carb.Float3(*region['center']),
+                                      quaternion(region['rotation']),hit_usage,False)
+                trial['affordance_observation']={'clear':not usage_hits,'colliders':sorted(set(usage_hits)),
+                    'geometry_sha256':affordance_digest(trial),
+                    'source':'Isaac Sim original USD finger colliders versus supplied usage-region boxes'}
             contacts = []
             observed_tools = []
             started = time.perf_counter()
@@ -229,6 +335,10 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 if point_op is not None:
                     point_op.Set(Gf.Matrix4d(*(trial_tcp(trial,q)@grasp_inverse).T.reshape(-1).tolist()))
                 world.step(render=video or frame % render_every == 0)
+                if trial.get('receiver_protocol',{}).get('policy')=='fixed_world' and hand_collision=='mesh':
+                    actual=np.asarray(UsdGeom.Mesh(stage.GetPrimAtPath('/World/Trial/Hand/mesh')).GetPointsAttr().Get())
+                    if not np.allclose(actual,trial['hand_mesh_world']['vertices'],atol=1e-6,rtol=0):
+                        raise RuntimeError('Receiver mesh moved during fixed-world execution')
                 hit_hand = [False]
 
                 def report_hit(hit):
@@ -245,7 +355,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                         query.overlap_box(carb.Float3(*b["half_extents"]), carb.Float3(*b["center"]),
                                           quaternion(b["rotation"]), report_hit, False)
                 contacts.append(hit_hand[0])
-                observed_tools.append(asset_robot.tool_pose() if asset_robot else trial_tcp(trial, q))
+                observed_tools.append(asset_robot.tool_pose()@transform(trial.get('T_asset_tool_grasp_frame',np.eye(4))) if asset_robot else trial_tcp(trial, q))
                 if video:
                     capture_file(frame_directory / f"{frame:06d}.png")
             result = evaluate(trial, contacts)
@@ -254,10 +364,12 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 result['safe_source'] = f'Isaac Sim PhysX actual USD robot collider overlap against hand {hand_collision}'
                 result['asset_robot'] = {**trial['asset_robot'], 'mesh_count':asset_robot.mesh_count,
                                         'collider_count':len(asset_robot.colliders), 'T_tcp_asset_tool':trial['T_tcp_asset_tool']}
-                result['object_asset'] = {k:trial['object_mesh_object'][k] for k in ('source_path','source_sha256')}
+                result['object_asset'] = {k:trial['object_mesh_object'].get(k) for k in ('source_path','source_sha256')}
                 result['grasp_contact'] = trial['asset_contact_fit']
                 result['asset_preparation'] = trial['asset_preparation']
+            result["camera_configuration"] = camera_record
             result["hand_collision"] = hand_collision
+            result['planning'] = trial.get('planning')
             result["execution_wall_time_s"] = time.perf_counter() - started
             result["backend"] = "isaacsim-physx"
             result["physics_scope"] = "Static hand colliders and " + ("USD robot collider" if asset_robot else "robot-box") + " overlap queries; kinematic robot and rigidly attached object; no grasp dynamics"

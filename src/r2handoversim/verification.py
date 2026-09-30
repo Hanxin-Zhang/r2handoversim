@@ -49,6 +49,13 @@ def verify_output(directory):
             equal('tool poses',data['T_world_tool'],commanded,1e-4)
             for pose in data['T_world_tool']: transform(pose)
             equal('object poses',data['T_world_object'],commanded@inverse(trial['T_object_gripper']))
+            if 'receiver' in trial:
+                receiver=trial['receiver']
+                for key in ('id','side','seed'):
+                    if str(data['receiver_'+key]) != str(receiver[key]):
+                        raise ValueError('Receiver metadata differs from trajectory')
+                equal('static receiver',data['T_world_hand'],np.repeat(np.asarray(receiver['T_world_hand'])[None],len(q),axis=0))
+                equal('static palm',data['palm_position_world'],np.repeat(np.asarray(trial['palm_position_world'])[None],len(q),axis=0))
             frames += len(q)
     return {'schema_version':'handover.output_verification.v1', 'status':'passed',
             'trials':len(rows), 'frames':frames,

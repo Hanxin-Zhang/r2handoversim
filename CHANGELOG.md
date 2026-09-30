@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.10.0
+
+- Sample visible left/right hand meshes with deterministic SE(3) poses before
+  method selection. Preserve receiver and object targets across all modes.
+- Calibrate full candidate sets against original USD pads; preserve failed
+  candidates and source provenance, and reject post-selection refitting.
+- Plan fixed receiver scenes in Isaac Sim using original robot colliders,
+  object convex hull and static hand triangles. Retain failed trials at home.
+- Add full-mesh Stability gate, hull Reach, original finger/region Affordance,
+  per-frame hand contact observations and receiver-pose trajectory exports.
+- Fix paired conversion and delivery inputs overwriting fixed receiver targets.
+- Add verified review-video captions and explicit paper-fidelity documentation.
+
+
 ## 0.9.0
 
 - Generate local-mesh demo batches without a method checkout, dataset manifest or weights.
