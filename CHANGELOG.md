@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0
+
+- Import a completed method pipeline directly, including optional delivery planning.
+- Convert paired FS/A1/A2/A3 experiments while holding the receiving hand and
+  object target fixed across modes, with shared tabletop clearance adjustment.
+- Retain failed plans in batch evaluation and record infeasible selections separately.
+- Reject duplicate trial IDs consistently in offline and Isaac Sim batch runs.
+
 ## 0.4.0
 
 - Convert imported dataset manifests to batch trials and accept `--trials` arrays.

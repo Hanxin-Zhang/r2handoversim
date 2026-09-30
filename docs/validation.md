@@ -90,3 +90,20 @@ continuous collision detection or the original paper's numeric results.
   through config import, dataset batch conversion and offline evaluation.
 - Reopened the neural-object animation in Isaac Sim's USD API: all 8192 source
   points were retained and the object cloud had 90 animated transform samples.
+
+## 0.5.0 runnable-workflow follow-up
+
+- Twenty-five tests pass, including shared receiver/object placement across
+  different grasps, preservation of failed plans, incomplete pipeline rejection
+  and duplicate-ID rejection in offline evaluation.
+- Converted the method's three-object/four-mode experiment with seed 0 and 80
+  RRT iterations. All 12 trials completed Isaac Sim replay and screenshot export:
+  nine passed, two failed Affordance, one failed Plan. These are demo outcomes.
+- Enabling table-aware planning exposed the old fixed-target placement's table
+  intersections. The experiment converter now applies one shared clearance lift
+  per object before planning any mode, preserving the paired receiver geometry.
+- A fresh original-weight bottle pipeline ran through manifest conversion and
+  triangle-mesh-hand PhysX evaluation. All active S0 criteria passed. Screenshot,
+  final USD, animated USD and reports were exported; screenshots were inspected.
+- Built and independently installed the 0.5.0 wheel and exercised manifest
+  conversion, paired planning and CPU evaluation outside both source trees.

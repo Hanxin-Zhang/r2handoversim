@@ -10,6 +10,15 @@ from .results import save_results
 def main(argv=None):
     parser = argparse.ArgumentParser(description="R2HandoverSim: Isaac Sim replay demos and offline evaluation")
     sub = parser.add_subparsers(dest="command", required=True)
+    pipeline = sub.add_parser("from-pipeline", help="Convert a completed one-command method run")
+    pipeline.add_argument("--pipeline", type=Path, required=True)
+    pipeline.add_argument("--seed", type=int, default=0)
+    pipeline.add_argument("--output", type=Path, default=Path("outputs/pipeline_trial.json"))
+    experiment = sub.add_parser("from-experiment", help="Plan paired FS/A1/A2/A3 trials with a fixed receiver")
+    experiment.add_argument("--manifest", type=Path, required=True)
+    experiment.add_argument("--seed", type=int, default=0)
+    experiment.add_argument("--iterations", type=int, default=200)
+    experiment.add_argument("--output", type=Path, default=Path("outputs/experiment_trials"))
     for command in ("demo", "evaluate"):
         p = sub.add_parser(command, help="Run Isaac Sim" if command == "demo" else "Check traces without a simulator")
         p.add_argument("--object", choices=[*NAMES, "all"], default="hammer")
@@ -41,6 +50,20 @@ def main(argv=None):
     dataset.add_argument("--output", type=Path, default=Path("outputs/dataset_trials"))
     args = parser.parse_args(argv)
     try:
+        if args.command == "from-pipeline":
+            from .workflows import from_pipeline
+            trial = from_pipeline(args.pipeline, args.seed)
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(json.dumps(trial, allow_nan=False))
+            print(args.output.resolve())
+            if trial.get("planning", {}).get("status") == "failed":
+                parser.exit(2, "Planning failed; failed trial saved for evaluation\n")
+            return
+        if args.command == "from-experiment":
+            from .workflows import from_experiment
+            trials, state = from_experiment(args.manifest, args.output, args.seed, args.iterations)
+            print(f"{len(trials)} paired trials, {state['planning_failures']} planning failures retained: {(args.output/'trials.json').resolve()}")
+            return
         if args.command == "from-dataset":
             manifest = json.loads(args.manifest.read_text())
             if manifest.get("schema_version") != "handover.dataset.v1":
@@ -89,6 +112,8 @@ def main(argv=None):
                    for v in (VARIANTS if args.variant == "all" else [args.variant])])
         if not isinstance(trials, list) or not trials:
             raise ValueError("Expected a nonempty JSON trial array")
+        if len({trial['id'] for trial in trials}) != len(trials):
+            raise ValueError("Duplicate trial ids are not allowed in a batch")
         for trial in trials:
             validate_trial(trial)
             import re

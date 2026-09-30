@@ -132,6 +132,14 @@ queries. Without this flag, collision evaluation uses the skeletal box proxies.
 The CPU planner/evaluator continues to use boxes in both cases. MANO-derived outputs remain local/generated assets
 and are not bundled in the repository.
 
+## Complete method runs and paired ablations
+
+`from-pipeline --pipeline /path/to/pipeline.json` converts a completed neural
+method run directly. `from-experiment --manifest /path/to/experiment.json`
+plans FS/A1/A2/A3 with the same world-frame receiving hand and object target
+for each object. Failed plans remain visible in the results.
+See [commands and comparison conventions](docs/workflows.md).
+
 ## Paper details and new targets
 
 ```bash
