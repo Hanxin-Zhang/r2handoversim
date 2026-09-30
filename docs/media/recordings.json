@@ -1,0 +1,72 @@
+{
+  "kind": "evaluated_isaacsim_replay",
+  "renderer": "pathtraced",
+  "visual_style": "lab",
+  "seed": 27,
+  "receiver_montage": [
+    {
+      "trial_id": "can_A2_can_receiver_27_0000_left",
+      "object_id": "can",
+      "variant": "A2",
+      "success": true,
+      "first_failure": null,
+      "metrics": {
+        "stability": true,
+        "plan": true,
+        "reach": true,
+        "affordance": null,
+        "safe": true
+      }
+    },
+    {
+      "trial_id": "can_A2_can_receiver_27_0001_right",
+      "object_id": "can",
+      "variant": "A2",
+      "success": true,
+      "first_failure": null,
+      "metrics": {
+        "stability": true,
+        "plan": true,
+        "reach": true,
+        "affordance": null,
+        "safe": true
+      }
+    },
+    {
+      "trial_id": "screwdriver_A2_screwdriver_receiver_27_0000_left",
+      "object_id": "screwdriver",
+      "variant": "A2",
+      "success": true,
+      "first_failure": null,
+      "metrics": {
+        "stability": true,
+        "plan": true,
+        "reach": true,
+        "affordance": true,
+        "safe": true
+      }
+    },
+    {
+      "trial_id": "screwdriver_A2_screwdriver_receiver_27_0001_right",
+      "object_id": "screwdriver",
+      "variant": "A2",
+      "success": true,
+      "first_failure": null,
+      "metrics": {
+        "stability": true,
+        "plan": true,
+        "reach": true,
+        "affordance": true,
+        "safe": true
+      }
+    }
+  ],
+  "hero_trial": "screwdriver_FS_screwdriver_receiver_27_0000_left",
+  "hero_metrics": {
+    "stability": true,
+    "plan": true,
+    "reach": true,
+    "affordance": true,
+    "safe": true
+  }
+}

@@ -1,119 +1,105 @@
-# Replay protocol v1
+# Handover protocol
 
-Each `handover.trial.v1` JSON stores all inputs needed for one standalone trial.
-Lengths are metres, angles radians, coordinates right-handed, Z up. Homogeneous
-transforms are row-major JSON arrays used with column vectors.
+The original-asset workflow connects UR5e/Robotiq geometry, object meshes and
+static receiving-hand meshes in Isaac Sim. Lengths are metres, angles radians;
+coordinates are right-handed with Z up. Homogeneous transforms are row-major
+JSON arrays acting on column vectors.
+
+## Scene → selection → execution
+
+1. **Prepare candidates.** Calibrate each grasp against the original finger-pad
+   surfaces. Preserve candidate IDs, object frame and calibration evidence.
+2. **Sample receivers.** Draw a seeded left/right hand pose within configured
+   SE(3) bounds. Reference-pose IK filters proposals before method selection.
+3. **Select grasps.** Run each method on the same receiver and object target.
+   The benchmark Stability policy uses full-object closing-axis projection;
+   calibrated local pad aperture separately controls gripper geometry.
+4. **Plan and replay.** Solve the full tool pose, then run RRT-Connect using
+   original USD robot colliders, the object convex hull and hand triangles.
+   Execute kinematic robot motion with rigid object attachment.
+5. **Evaluate and export.** Record all metric flags, first failure, numeric
+   trajectories, receiver transforms and rendered media.
+
+Use [the quickstart](quickstart.md) for commands and
+[receiver configuration](fixed_receivers.md) for frames and sampling settings.
+
+## Evaluation
+
+| Metric | Original-asset evaluation |
+|---|---|
+| Stability | Full object-mesh projection along the closing axis ≤ 0.085 m |
+| Plan | Feasible full-pose IK and collision-checked path |
+| Reach | Object hull intersects a sphere centred at palm + 0.12 m × palm normal, radius 0.10 m |
+| Affordance | Original finger colliders preserve the supplied human-usage volumes; applies in S1 |
+| Safe | Original robot colliders are clear of the static hand mesh at every replay frame |
+
+First-failure attribution is **Stability → Plan → Reach → Affordance → Safe**.
+Each record retains all independently evaluated flags. S0 reports Affordance as
+null and uses the other four checks for success. Per-split success and
+first-failure rates sum to 100%.
+
+Planning uses explicit allowed contacts for internal gripper links, neighbouring
+arm links, the mounted shoulder/table and the held object with gripper/distal
+wrist. Candidate contact validation checks both pad surfaces at 0.2 mm tolerance.
+The default path is sampled at 60 Hz with a 0.6 rad/s joint-speed cap.
+
+## Trial schema
+
+Every `handover.trial.v1` JSON is a replay input. A resolved `*_trial.json`
+records the calibrated scene and can be loaded directly with `demo --trial`.
 
 | Field | Meaning |
 |---|---|
-| `id`, `object_id`, `variant`, `provenance` | Identifiers and source description |
-| `split` | S0 or S1; controls whether affordance contributes to success |
-| `T_object_gripper` | Maps gripper/TCP coordinates into canonical object coordinates |
-| `target_T_world_gripper` | Expected endpoint of the supplied plan |
-| `object_boxes`, `usage_boxes` | Oriented box unions in object coordinates |
-| `hand_boxes_world` | Static receiving-hand collision geometry in world coordinates |
-| `palm_position_world`, `palm_normal_world` | Reach-region origin and direction |
-| `reach_offset_m`, `reach_radius_m` | Default 0.12 and 0.10 |
-| `max_opening_m` | Default 0.085 |
-| `planned_joints`, `executed_joints` | Nonempty arrays of six-angle configurations; these may differ |
-| `dt_s` | Time interval between replay samples; default 1/60 |
+| `id`, `object_id`, `variant`, `split` | Trial identity, method setting and S0/S1 evaluation setting |
+| `provenance`, `source_data` | Input sources and hashes |
+| `asset_robot`, `object_mesh_object` | Local robot assembly and object-frame mesh |
+| `T_object_gripper`, `grasp_contract` | Selected grasp and frame/width conventions |
+| `T_tcp_asset_tool` | Calibrated robot-tool transform |
+| `target_T_world_object` | Shared object delivery pose |
+| `target_T_world_gripper` | Required tool pose for this selected grasp |
+| `receiver` | ID, side, seed, sample index, mesh source and `T_world_hand` |
+| `receiver_protocol` | `fixed_world` policy, sampling bounds and planner settings |
+| `hand_mesh_world` | Static hand vertices and triangle indices in world coordinates |
+| `palm_position_world`, `palm_normal_world` | Reach-region origin and outward direction |
+| `usage_boxes` | Supplied object-frame human-usage volumes |
+| `planned_joints`, `executed_joints`, `dt_s` | Six-joint trajectories and sample interval |
+| `planning` | Status, algorithm, seed, collision scope and measured planning time |
 
-UR5e FK uses a fixed base at `[0,0,0.75]` and a 0.12 m tool offset from flange
-to the simplified gripper TCP. These are explicit demo choices. The object pose
-at each frame is `T_world_gripper @ inverse(T_object_gripper)`.
+The object pose follows `T_world_gripper @ inverse(T_object_gripper)`.
+The configured robot placement defines its world base frame. Calibration and
+saved scene/path digests bind a replay to its input geometry.
 
-Boxes contain `center`, positive `half_extents`, proper `rotation`, and optional
-`label`. The same proxy dimensions are used by the CPU evaluator, Isaac Sim
-visuals and PhysX overlap queries. The static hand boxes are registered as
-PhysX colliders. Moving robot boxes are queried against those colliders; no
-dynamic robot or hand grasp controller is required.
+Optional `object_boxes` and `hand_boxes_world` support auxiliary CPU geometry
+checks. Each box defines `center`, positive `half_extents`, a proper `rotation`
+and an optional `label`. Optional `delivery` supplies a method target and body
+keypoints; `obstacle_boxes_world` specifies additional obstacles.
 
-Each result contains five flags, first failure, success, width, contact-frame
-indices, safety source and explicit evaluation scope. The paper names are
-retained, but **Plan and geometry fidelity are simplified**. The supplied path
-check is limited to endpoints, joint limits, and hand clearance; passing it does
-not certify self-collision or environmental collision freedom. Missing or empty
-paths are rejected rather than silently reported as successful.
+## Records and reporting
 
-Stability checks global projected object width. This can be conservative for
-multi-part objects. The method's approach-point usage constraint and the
-benchmark's finger-volume affordance constraint are different: for example,
-the region-agnostic hammer can pass the finger-volume proxy check even though
-its selected approach point lies in the reserved region. See the JSON flags
-rather than assuming every ablation must fail.
+- **`run.json`** identifies the run, status and expected/completed trial count.
+  The supervisor checks it after the simulator exits.
+- **`*_trajectory.npz`** aligns timestamps, six arm joints, observed tool/object
+  poses and contact flags; fixed receivers also export their transform and palm
+  position. Read arrays with `numpy.load(path, allow_pickle=False)`.
+- **`results.json/csv` and `report.html`** pair metric flags, first failure and
+  success with scene and media links.
+- **`paper_table.json/csv`** computes trial means per object, equally weighted
+  object means per split, then equally weighted S0/S1 Avg. For Avg only, S0's
+  Affordance contribution is zero, following the paper's footnote.
+- **Timing** separates measured planning seconds, simulated execution seconds
+  and simulator wall time. Total time combines planning and execution where
+  both are present; unmeasured values use null.
 
-## Demo generation
+A metric failure is a completed evaluated trial. Infrastructure errors use a
+failed run status and nonzero CLI exit. `verify-output` checks artifact counts,
+scene bindings, numeric arrays and result consistency. Video captions draw
+outcomes from these same verified records.
 
-The assets were generated from the companion method's procedural scenes. Normal
-trials interpolate a fixed UR5e home/goal pair with a smooth cubic time profile.
-Execution-deviation fixtures insert a position-IK waypoint inside the palm;
-missed-delivery fixtures keep the executed robot at home. All trajectories are
-stored explicitly, so the simulator does not need the companion package or a
-random seed to replay them. The complete release set has 12 trials.
+## Paper-reference replay
 
-## Extending
+`paper-replay` exports 8,000 `reconstructed_replay` records with reference
+settings and outcomes matching Table I's 108 aggregate cells. Their source
+settings, record population and aggregate checks accompany the export.
+Simulator evaluation writes its own outcomes alongside the reference fields.
 
-Replace boxes with your own geometric approximation and provide trajectories
-from any planner. Keep the transform convention unchanged. A full MoveIt
-backend, robot CAD/articulation or neural policy can be added
-later without changing failure-order semantics. Do not compare demo success
-rates to the paper's table: assets, splits, geometry and planner differ.
-
-## Predicted hand and execution status (0.2.0)
-
-Optional `hand_mesh_world` contains `vertices` (N x 3 finite coordinates) and
-`faces` (M x 3 integer vertex indices). By default it is used for rendering,
-with `hand_boxes_world` as the collision approximation. In 0.3.0,
-`--hand-collision mesh` uses the triangles as the static PhysX collider for Safe.
-The CPU evaluator and planner continue to use the box approximation. Conversion from
-the companion method now preserves a supplied `palm_normal` instead of always
-substituting the procedural default.
-
-`run.json` includes a unique run id, status, expected/completed trial counts and
-an error message when relevant. The parent process checks the matching run id
-and fresh result count after the Kit worker exits. A metric failure is a valid
-completed trial and does not make the CLI fail; simulator/infrastructure errors
-do produce a nonzero exit status.
-
-`--animation` produces an additional self-contained USD with 60 Hz samples for
-the default fixtures (or the rate defined by `dt_s`). These are kinematic
-transform samples, not a saved dynamic articulation simulation. `report.html`
-links only artifacts recorded as produced by the current run; stale screenshots
-from an earlier run in the same directory are not presented as current outputs.
-
-## Planned trials and table aggregation (0.3.0)
-
-Optional `delivery` contains the companion method's computed world-frame target
-and body keypoints. These keypoints are visual references, not colliders.
-Optional `obstacle_boxes_world` specifies planner obstacle geometry.
-Optional `planning` records status, algorithm, random seed, tolerances,
-collision scope, failure reason and measured time. Such trials receive the
-stronger Plan check described in [paper details](paper_details.md). The original
-12 stored traces still use their original lightweight check.
-
-Results add `execution_time_s` (simulated duration), `total_time_s` (null without
-measured planning), and a measured `planning_time_s` for new plans. Isaac Sim
-results record `hand_collision` and the actual collision source.
-`paper_table.csv/json` follows Table I object and split weights; the existing
-`summary.json` remains a pooled trial summary.
-
-## Configured object clouds (0.4.0)
-
-Optional `object_points_object` contains original object-frame XYZ points for
-USD Points display/animation. `object_boxes` remains the metric/collision proxy.
-`source_data` and `annotation_status` survive conversion into results. `--trials`
-accepts a nonempty JSON array of complete trial objects; `from-dataset` creates
-such a batch from the companion import manifest. See [dataset.md](dataset.md).
-
-## Fixed-world original assets (0.10.0)
-
-`receiver` records static world hand pose, side, seed, source mesh hash and
-sample index. `receiver_protocol.policy=fixed_world` preserves that scene;
-`replan_in_isaac=true` defers planning to the live original-collider backend.
-`target_T_world_object` is shared across modes. `method_selection` and
-`grasp_contract` preserve the selected pose and local opening, while
-`stability_width_m` stores the separate full-mesh closing-axis projection.
-Changing a fixed scene's target via a delivery input is rejected. Candidate
-asset fitting is performed before selection via `prepare-candidates`, with
-failed candidates retained. See [fixed receivers](fixed_receivers.md) for input
-schemas, operation order, sampling definitions and remaining paper gaps.
+[Paper-to-code mapping](paper_details.md) · [Validation records](validation.md)

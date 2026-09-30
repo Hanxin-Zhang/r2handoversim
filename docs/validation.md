@@ -59,7 +59,7 @@ Validation used Isaac Sim 5.0 and the kinematic replay protocol.
 - The skeletal ergonomic target produced by the companion method yielded an
   85-frame planned trajectory. Isaac Sim replay passed all five S1 criteria and
   exported a screenshot, report and animation. Supplied keypoint visualization
-  was visually inspected; `ergonomic_demo.png` is from this actual run.
+  was visually inspected using the screenshot exported by that run.
 - The real coarse Text2HOI/MANO bottle output ran with triangle-mesh hand
   collision enabled and passed all active S0 criteria.
 - A separate unsafe trajectory with a procedural triangulated hand generated
@@ -271,3 +271,17 @@ These are four camera views of the same replay.
 The 12 default fixtures also passed a fresh realtime lab-preset run (1,077
 frames), with all numeric arrays and results unchanged from the earlier
 fixture regression. The CPU suite passed all 64 tests and the wheel built.
+
+## README original-asset showcase — 2026-10-01
+
+Recorded four A2 scenes in separate Isaac Sim 5.0 processes with the lab preset,
+path tracing and the right camera: can left/right (169/91 frames), screwdriver
+left/right (247/301 frames). All four runs passed `verify-output`, totalling
+808 observed frames, and all applicable metric checks passed. Receiver seed 27
+and outward sampling bounds match the configured fixed-world scene inputs.
+
+The homepage presents these four independent 0.5× replays as a labelled montage,
+and the previously verified FS screwdriver replay as synchronized dual-view and
+four-camera media. Inline GIFs link to HD MP4 attachments. The
+[media record](media/recordings.json) retains each displayed trial's evaluated
+outcome and method setting.

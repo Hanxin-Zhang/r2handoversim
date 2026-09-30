@@ -2,8 +2,8 @@
 
 The asset workflow renders the actual UR5e/Robotiq USD, original object mesh and
 an explicitly configured left or right hand mesh. Each sampled hand stays fixed
-through candidate selection, planning and recording. The default primitive demos
-remain installation checks; use this workflow to review actual assets.
+through candidate selection, planning and recording. Start with the
+[step-by-step setup](quickstart.md) to build your first original-asset scene.
 
 ## Inputs and ordering
 
@@ -34,8 +34,7 @@ the repository does not redistribute MANO model weights or hand templates.
 
 The example places the palm in world X `[-0.72, -0.60]`, Y `[-0.45, -0.30]`,
 Z `[0.88, 0.98]` metres. With the supported robot base at `[0, 0, 0.75]`,
-this gives a horizontal base-to-palm distance of 0.67–0.85 m, outward from
-the earlier compact demo region (0.40–0.66 m). Reference IK still filters
+this gives a horizontal base-to-palm distance of 0.67–0.85 m. Reference IK filters
 unreachable proposals before method selection. These configurable demo bounds
 are recorded with each sample. Existing saved trials retain their original hand poses.
 

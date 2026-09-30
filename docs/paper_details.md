@@ -66,7 +66,9 @@ that record yields a Plan failure unless an earlier Stability check fails.
 Absence of an IK solution or failure within the search budget is an observed
 planning failure, not proof that no feasible path exists.
 
-![Actual Isaac Sim ergonomic target replay; purple segments are supplied keypoints](ergonomic_demo.png)
+![Original-asset replay from four camera views](media/cameras.jpg)
+
+[Watch the synchronized replay](https://github.com/Hanxin-Zhang/r2handoversim/releases/download/v0.11.0/multiview.mp4).
 
 ## Use the static hand triangles for Safe
 
