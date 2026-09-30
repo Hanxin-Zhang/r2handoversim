@@ -1,13 +1,25 @@
-# Release 0.10.0
+# Release 0.11.0
 
 This release is ready for users to install and run kinematic handover replay.
 Its supported workflows are procedural Isaac Sim demos, original local
 UR5e/Robotiq and OBJ replay, method JSON interchange, and paper-reference replay.
 The main benchmark entry point runs Isaac Sim; CPU evaluation is auxiliary.
 
+## New in 0.11.0
+
+The default receiver region is farther from the supported robot base (0.67–0.85 m
+horizontal palm distance), while retaining preselection reference-IK filtering.
+The default lab appearance uses neutral grey surfaces, a dark workbench and five
+soft area lights. Optional path tracing and left/right/elevated cameras produce
+complementary review videos. See [rendering](rendering.md) for commands.
+
+The four-camera recording and all 12 default fixtures were checked against the
+previous numeric exports: trajectories, contacts and evaluated results were
+unchanged. Existing saved trials keep their original receiver positions.
+
 ## Fixed receiver integration
 
-This release adds visible sampled MANO meshes, immutable world hand/object
+The release includes visible sampled MANO meshes, immutable world hand/object
 poses across method modes, preselection candidate contact calibration, and
 original-collider PhysX planning. Follow [fixed receivers](fixed_receivers.md)
 for the supported sequence and exact remaining paper fidelity gaps.
@@ -44,7 +56,7 @@ Run tests in an environment with the optional `planning,assets` dependencies.
 python -m pip install build twine
 python -m build
 python -m twine check dist/*
-python -m pip install './dist/r2handoversim-0.10.0-py3-none-any.whl[planning,assets]'
+python -m pip install './dist/r2handoversim-0.11.0-py3-none-any.whl[planning,assets]'
 python -m unittest discover -s tests -v
 python scripts/release_smoke.py
 ```

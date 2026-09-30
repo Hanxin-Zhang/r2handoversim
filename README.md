@@ -1,5 +1,7 @@
 # R2HandoverSim
 
+Latest release: [v0.11.0](https://github.com/Hanxin-Zhang/r2handoversim/releases/tag/v0.11.0) — outward receiver sampling, laboratory lighting and multi-view replay.
+
 For original robot/object assets and visible random left/right receiving hands,
 see [fixed-world receiver replay](docs/fixed_receivers.md). This workflow samples
 hands before method selection and records the fixed hand pose with every trace.

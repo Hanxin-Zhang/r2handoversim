@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.11.0
 
 - Add a neutral laboratory render preset with five area lights, smooth hand
   shading, optional path tracing and complementary detail camera views.
