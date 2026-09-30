@@ -12,7 +12,7 @@ def write_report(results, output):
         name = str(r["trial_id"])
         links = []
         if re.fullmatch(r"[a-zA-Z0-9_-]+", name):
-            for suffix, label in [(".png", "Screenshot"), (".usda", "Scene"), ("_animation.usda", "Animation")]:
+            for suffix, label in [(".mp4", "Video"), (".png", "Screenshot"), (".usda", "Scene"), ("_animation.usda", "Animation")]:
                 filename = name + suffix
                 if filename in r.get("artifacts", {}).values() and (output/filename).exists():
                     links.append(f'<a href="{filename}">{label}</a>')

@@ -13,7 +13,8 @@ from .robot import tcp
 from .results import save_results
 
 
-def replay(trials, output, headless=False, hold=False, render_every=1, screenshot=False, animation=False, run_id=None, hand_collision="boxes"):
+def replay(trials, output, headless=False, hold=False, render_every=1, screenshot=False, animation=False, run_id=None, hand_collision="boxes",
+           video=False, video_speed=1., camera="overview"):
     if render_every < 1:
         raise ValueError("render_every must be at least 1")
     for trial in trials:
@@ -50,6 +51,26 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
         dome.CreateIntensityAttr(1500.)
         set_camera_view(eye=np.array([1.3, -1.8, 1.8]), target=np.array([-.35, -.1, 1.05]))
 
+        def capture_file(path):
+            from omni.kit.viewport.utility import get_active_viewport, capture_viewport_to_file
+            import asyncio
+            path = Path(path).resolve()
+            path.unlink(missing_ok=True)
+            capture = capture_viewport_to_file(get_active_viewport(), str(path))
+            done = asyncio.ensure_future(capture.wait_for_result())
+            deadline = time.monotonic() + 60
+            while not done.done():
+                app.update()
+                if time.monotonic() > deadline:
+                    done.cancel()
+                    raise RuntimeError("Viewport capture timed out after 60 seconds")
+            done.result()
+            from .video import complete_png
+            while not complete_png(path):
+                app.update()
+                if time.monotonic() > deadline:
+                    raise RuntimeError(f"Viewport PNG write timed out: {path}")
+
         def quaternion(rotation):
             # USD/Gf uses row-vector matrices, NumPy kernel uses columns.
             matrix = Gf.Matrix3d(*np.asarray(rotation).T.reshape(-1).tolist())
@@ -84,6 +105,15 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
             if stage.GetPrimAtPath("/World/Trial"):
                 stage.RemovePrim("/World/Trial")
             UsdGeom.Xform.Define(stage, "/World/Trial")
+            if camera == "handover":
+                target = np.asarray(trial["palm_position_world"])
+                set_camera_view(eye=target+np.array([.48, -.65, .38]), target=target)
+            frame_directory = output / f"{trial['id']}_frames"
+            if video:
+                # A fresh directory prevents stale frames entering a rerun.
+                import shutil
+                shutil.rmtree(frame_directory, ignore_errors=True)
+                frame_directory.mkdir()
             if "delivery" in trial and "keypoints_world" in trial["delivery"]:
                 from .robot import segment_box
                 delivery = trial["delivery"]
@@ -151,6 +181,9 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 circle.CreateDisplayColorAttr([Gf.Vec3f(.15, .8, .3)])
             world.reset()
             world.step(render=True)
+            if video or screenshot:
+                for _ in range(8):
+                    world.render()
             query = get_physx_scene_query_interface()
             contacts = []
             started = time.perf_counter()
@@ -164,7 +197,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                     update_box(op, moved(b, tcp(q) @ grasp_inverse))
                 if point_op is not None:
                     point_op.Set(Gf.Matrix4d(*(tcp(q)@grasp_inverse).T.reshape(-1).tolist()))
-                world.step(render=frame % render_every == 0)
+                world.step(render=video or frame % render_every == 0)
                 hit_hand = [False]
 
                 def report_hit(hit):
@@ -176,6 +209,8 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                     query.overlap_box(carb.Float3(*b["half_extents"]), carb.Float3(*b["center"]),
                                       quaternion(b["rotation"]), report_hit, False)
                 contacts.append(hit_hand[0])
+                if video:
+                    capture_file(frame_directory / f"{frame:06d}.png")
             result = evaluate(trial, contacts)
             result["safe_source"] = f"Isaac Sim PhysX robot-box overlap against static hand {hand_collision} at every frame"
             result["hand_collision"] = hand_collision
@@ -192,20 +227,18 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
             if not stage.Export(str(snapshot)):
                 raise RuntimeError("USD scene export failed")
             result["artifacts"] = {"scene": snapshot.name}
+            if video:
+                from .video import encode_frames
+                destination = output / f"{trial['id']}.mp4"
+                encode_frames(frame_directory, destination, len(contacts), trial["dt_s"], video_speed)
+                result["artifacts"]["video"] = destination.name
+                result["recording"] = {"source": "Isaac Sim viewport", "camera": camera,
+                    "captured_frames": len(contacts), "simulation_dt_s": trial["dt_s"],
+                    "playback_speed": video_speed, "output_fps": 30, "start_hold_s": 1, "end_hold_s": 2}
+                shutil.rmtree(frame_directory)
             if screenshot:
-                from omni.kit.viewport.utility import get_active_viewport, capture_viewport_to_file
                 world.render()
-                capture = capture_viewport_to_file(get_active_viewport(), str((output / f"{trial['id']}.png").resolve()))
-                # Let the asynchronous capture complete before changing the stage.
-                import asyncio
-                done = asyncio.ensure_future(capture.wait_for_result())
-                deadline = time.monotonic() + 60
-                while not done.done():
-                    app.update()
-                    if time.monotonic() > deadline:
-                        done.cancel()
-                        raise RuntimeError("Screenshot capture timed out after 60 seconds")
-                done.result()
+                capture_file(output / f"{trial['id']}.png")
                 result["artifacts"]["screenshot"] = f"{trial['id']}.png"
             if animation:
                 from .animation import bake

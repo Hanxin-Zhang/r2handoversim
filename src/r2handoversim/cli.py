@@ -32,6 +32,9 @@ def main(argv=None):
             p.add_argument("--render-every", type=int, default=1)
             p.add_argument("--screenshot", action="store_true")
             p.add_argument("--animation", action="store_true", help="Export a USD with sampled replay animation")
+            p.add_argument("--video", action="store_true", help="Record actual viewport frames to MP4 (requires ffmpeg)")
+            p.add_argument("--video-speed", type=float, default=1., help="Playback speed; 0.25 gives quarter-speed review")
+            p.add_argument("--camera", choices=["overview", "handover"], default="overview")
             p.add_argument("--hand-collision", choices=["boxes", "mesh"], default="boxes",
                            help="Use supplied hand triangles for PhysX safety instead of boxes")
     convert = sub.add_parser("from-intent", help="Convert method scene + selection to a demo joint-replay trial")
@@ -123,7 +126,7 @@ def main(argv=None):
         if args.command == "demo":
             from .runner import replay
             results = replay(trials, args.output, args.headless, args.hold, args.render_every, args.screenshot, args.animation,
-                             hand_collision=args.hand_collision)
+                             hand_collision=args.hand_collision, video=args.video, video_speed=args.video_speed, camera=args.camera)
         else:
             results = [evaluate(t) for t in trials]
             for result in results:

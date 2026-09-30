@@ -107,3 +107,19 @@ continuous collision detection or the original paper's numeric results.
   final USD, animated USD and reports were exported; screenshots were inspected.
 - Built and independently installed the 0.5.0 wheel and exercised manifest
   conversion, paired planning and CPU evaluation outside both source trees.
+
+## 0.6.0 viewport recording
+
+- Twenty-nine benchmark tests pass (plus 23 unchanged method tests). New tests
+  cover missing encoders, partial PNG writes, missing frames and encoder failures
+  that must preserve an existing video.
+- Actual Isaac Sim viewport recordings exercised the planned ergonomic hammer,
+  coarse Text2HOI/MANO bottle, configured binoculars point cloud with a predicted
+  left hand, an affordance failure and an execution-deviation safety failure.
+- MP4 capture renders every executed frame and waits for PNG completion before
+  encoding. The bottle run captured 90 simulation frames and produced a 1280x800,
+  H.264, 30 fps video at quarter speed, with start/end inspection holds.
+- Recording preserves the failure classifications; the unsafe hammer still
+  produces exactly 15 PhysX hand-contact frames. Capture overhead is included
+  only in simulator wall time, not trajectory duration.
+- Generated MANO-derived videos remain local review artifacts, outside Git.

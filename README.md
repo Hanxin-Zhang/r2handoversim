@@ -53,6 +53,22 @@ a final-scene `.usda` per trial. `--screenshot` adds PNGs; `--animation` adds
 in a USD viewer. Open `report.html` to inspect metric flags and artifact links.
 `--hold` keeps the GUI open after completion.
 
+Record an MP4 directly from the Isaac Sim viewport (install `ffmpeg` on PATH):
+
+```bash
+r2handoversim demo --object hammer --headless --video --video-speed 0.25 \
+  --screenshot --output outputs/recording
+```
+
+`--video` captures every replay frame, even with `--render-every` set. Videos
+use H.264 at 30 fps, with one second held at the start and two at the end.
+`--video-speed 0.25` slows playback to one quarter; simulation timestamps and
+metrics remain unchanged. `--camera handover` frames the receiving hand closely;
+the default `overview` shows the robot. `report.html` links each MP4, and
+`results.json` records capture settings. Wall time includes recording overhead.
+Failed capture or encoding fails the run; frame images remain for diagnosis
+when encoding fails and are removed after successful encoding.
+
 A supervisor process verifies the current run id and completion count after Kit
 exits. Missing simulator dependencies, failed captures, crashes and incomplete
 runs produce a nonzero CLI exit code instead of being mistaken for success.

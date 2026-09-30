@@ -24,11 +24,20 @@ def check_completion(output, run_id, expected, returncode):
         raise RuntimeError(f"Isaac Sim did not produce a valid run manifest/result: {exc}") from exc
 
 
-def replay(trials, output, headless=False, hold=False, render_every=1, screenshot=False, animation=False, hand_collision="boxes"):
+def replay(trials, output, headless=False, hold=False, render_every=1, screenshot=False, animation=False, hand_collision="boxes",
+           video=False, video_speed=1., camera="overview"):
     if not trials:
         raise ValueError("At least one trial is required")
     if render_every < 1:
         raise ValueError("render_every must be at least 1")
+    import math
+    if not math.isfinite(video_speed) or video_speed <= 0:
+        raise ValueError("Video speed must be positive and finite")
+    if camera not in ("overview", "handover"):
+        raise ValueError("Camera must be overview or handover")
+    if video:
+        from .video import require_encoder
+        require_encoder()
     for trial in trials:
         validate_trial(trial)
         if hand_collision == "mesh" and "hand_mesh_world" not in trial:
@@ -44,7 +53,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
         "expected_trials": len(trials), "completed_trials": 0}))
     job = {"trials": trials, "output": str(output), "headless": headless, "hold": hold,
            "render_every": render_every, "screenshot": screenshot, "animation": animation, "run_id": run_id,
-           "hand_collision": hand_collision}
+           "hand_collision": hand_collision, "video": video, "video_speed": video_speed, "camera": camera}
     with tempfile.TemporaryDirectory(prefix="r2handover-job-") as tmp:
         path = Path(tmp) / "job.json"
         path.write_text(json.dumps(job, allow_nan=False))

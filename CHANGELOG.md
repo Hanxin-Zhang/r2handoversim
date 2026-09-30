@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0
+
+- Record actual Isaac Sim viewport frames to H.264 MP4 with configurable playback
+  speed, overview/receiving-hand cameras and report links.
+- Wait for asynchronous PNG writes to finish after the viewport capture callback.
+- Reject missing encoders/frames and preserve prior videos on encoding failure.
+
 ## 0.5.0
 
 - Import a completed method pipeline directly, including optional delivery planning.
