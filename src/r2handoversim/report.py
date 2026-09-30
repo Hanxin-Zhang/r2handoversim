@@ -32,4 +32,5 @@ body{background:#111b2d;color:#e9f0ff;font:15px system-ui;margin:40px auto;max-w
     document += '<p>Safety source: ' + html.escape('; '.join(sorted({r.get("safe_source", "unspecified") for r in results}))) + '</p>'
     document += '<div class="scroll"><table><tr><th>Trial</th><th>Split</th>' + ''.join(f'<th>{m.title()}</th>' for m in metrics) + '<th>First failure</th><th>Artifacts</th></tr>' + ''.join(rows) + '</table></div>'
     document += '<p>Release demo results, not paper measurements. Plan checks a provided joint path; Safe uses sampled overlap. S0 omits Affordance. First failure: Stability → Plan → Reach → Affordance → Safe.</p><p><a href="results.json">JSON</a> · <a href="results.csv">CSV</a> · <a href="summary.json">Summary</a></p></html>'
+    document = document.replace('</html>', '<p>Table I aggregation (per object, then per split): <a href="paper_table.csv">CSV</a> · <a href="paper_table.json">JSON and conventions</a></p></html>')
     (output/'report.html').write_text(document)

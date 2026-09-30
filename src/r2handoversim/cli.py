@@ -22,17 +22,35 @@ def main(argv=None):
             p.add_argument("--render-every", type=int, default=1)
             p.add_argument("--screenshot", action="store_true")
             p.add_argument("--animation", action="store_true", help="Export a USD with sampled replay animation")
+            p.add_argument("--hand-collision", choices=["boxes", "mesh"], default="boxes",
+                           help="Use supplied hand triangles for PhysX safety instead of boxes")
     convert = sub.add_parser("from-intent", help="Convert method scene + selection to a demo joint-replay trial")
     convert.add_argument("--scene", type=Path, required=True)
     convert.add_argument("--selection", type=Path, required=True)
+    convert.add_argument("--delivery", type=Path, help="Method delivery target; runs pose IK and RRT-Connect")
+    convert.add_argument("--seed", type=int, default=0)
     convert.add_argument("--output", type=Path, default=Path("outputs/intent_trial.json"))
+    plan = sub.add_parser("plan", help="Solve the trial target pose and search a collision-checked joint path")
+    plan.add_argument("--trial", type=Path, required=True)
+    plan.add_argument("--seed", type=int, default=0)
+    plan.add_argument("--iterations", type=int, default=600)
+    plan.add_argument("--output", type=Path, default=Path("outputs/planned_trial.json"))
     args = parser.parse_args(argv)
     try:
-        if args.command == "from-intent":
-            trial = from_selection(json.loads(args.scene.read_text()), json.loads(args.selection.read_text()))
+        if args.command in ("from-intent", "plan"):
+            if args.command == "from-intent":
+                trial = from_selection(json.loads(args.scene.read_text()), json.loads(args.selection.read_text()),
+                    delivery=json.loads(args.delivery.read_text()) if args.delivery else None)
+            else:
+                trial = json.loads(args.trial.read_text())
+            if args.command == "plan" or args.delivery:
+                from .planning import plan_trial
+                trial = plan_trial(trial, seed=args.seed, iterations=getattr(args, "iterations", 600))
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(json.dumps(trial, indent=2, allow_nan=False))
             print(args.output.resolve())
+            if trial.get("planning", {}).get("status") == "failed":
+                parser.exit(2, f"Planning failed: {trial['planning']['reason']}; failed trial saved for evaluation\n")
             return
         trials = ([json.loads(args.trial.read_text())] if args.trial else
                   [load_demo(n, v) for n in (NAMES if args.object == "all" else [args.object])
@@ -45,7 +63,8 @@ def main(argv=None):
         args.output.mkdir(parents=True, exist_ok=True)
         if args.command == "demo":
             from .runner import replay
-            results = replay(trials, args.output, args.headless, args.hold, args.render_every, args.screenshot, args.animation)
+            results = replay(trials, args.output, args.headless, args.hold, args.render_every, args.screenshot, args.animation,
+                             hand_collision=args.hand_collision)
         else:
             results = [evaluate(t) for t in trials]
             for result in results:

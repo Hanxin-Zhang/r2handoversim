@@ -16,7 +16,7 @@ def load_demo(name, variant="intent_aware"):
     return json.loads(files(__package__).joinpath("assets", f"{name}_{variant}.json").read_text())
 
 
-def from_selection(scene, selection, steps=90, variant="intent_aware"):
+def from_selection(scene, selection, steps=90, variant="intent_aware", delivery=None):
     if scene.get("schema_version") != "handover.scene.v1" or selection.get("schema_version") != "handover.selection.v1":
         raise ValueError("Expected Intent-Handover v1 scene and selection")
     if selection.get("status") != "ok" or not selection.get("selected"):
@@ -25,6 +25,14 @@ def from_selection(scene, selection, steps=90, variant="intent_aware"):
         raise ValueError("Scene and selection object ids differ")
     grasp = transform(selection["selected"]["T_object_gripper"])
     goal = tcp(GOAL)
+    if delivery is not None:
+        if (delivery.get("schema_version") != "handover.delivery.v1" or delivery.get("units") != "m"
+                or delivery["object_id"] != scene["object"]["id"]
+                or delivery["grasp_id"] != selection["selected"]["id"]):
+            raise ValueError("Delivery target must match this object and selected grasp")
+        goal = transform(delivery["T_world_gripper"])
+        if not np.allclose(goal@inverse(grasp), transform(delivery["T_world_object"]), atol=1e-6):
+            raise ValueError("Delivery object and gripper transforms are inconsistent")
     world_object = goal @ inverse(grasp)
     region = scene["intent"]["human_region"]
     # Receiving hand in object coordinates; bundled demos use procedural proxies.
@@ -56,4 +64,9 @@ def from_selection(scene, selection, steps=90, variant="intent_aware"):
         mesh = scene["receiving_hand"]["mesh"]
         trial["hand_mesh_world"] = {"vertices": points(world_object, mesh["vertices"]).tolist(),
                                     "faces": deepcopy(mesh["faces"])}
+    if delivery is not None:
+        # A target pose is not a solved trajectory. The caller must run plan_trial.
+        trial["planned_joints"] = [HOME.tolist()]
+        trial["executed_joints"] = [HOME.tolist()]
+        trial["delivery"] = deepcopy(delivery)
     return trial

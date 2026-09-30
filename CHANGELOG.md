@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+- Add numerical full-pose IK and a portable RRT-Connect planner, with sampled
+  robot, attached-object, receiving-hand and obstacle box collision checks.
+- Consume ergonomic delivery targets without relocating the hand to a fixed goal.
+- Add optional static triangle-mesh hand collisions in Isaac Sim.
+- Export Table I object/split aggregation and measured planning times.
+- Visualize supplied skeletal keypoints and target direction in Isaac Sim.
+
 ## 0.2.0
 
 - Supervise Isaac Sim in a separate process and reject stale/incomplete run

@@ -13,7 +13,7 @@ from .robot import tcp
 from .results import save_results
 
 
-def replay(trials, output, headless=False, hold=False, render_every=1, screenshot=False, animation=False, run_id=None):
+def replay(trials, output, headless=False, hold=False, render_every=1, screenshot=False, animation=False, run_id=None, hand_collision="boxes"):
     if render_every < 1:
         raise ValueError("render_every must be at least 1")
     for trial in trials:
@@ -84,18 +84,38 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
             if stage.GetPrimAtPath("/World/Trial"):
                 stage.RemovePrim("/World/Trial")
             UsdGeom.Xform.Define(stage, "/World/Trial")
+            if "delivery" in trial and "keypoints_world" in trial["delivery"]:
+                from .robot import segment_box
+                delivery = trial["delivery"]
+                kp = delivery["keypoints_world"]
+                shoulder = delivery["shoulder_midpoint"]
+                segments = [(kp["left_shoulder"], kp["right_shoulder"]),
+                            (shoulder, delivery["torso_center"]), (shoulder, kp["elbow"]),
+                            (kp["elbow"], kp["wrist"])]
+                for i, (a, b) in enumerate(segments):
+                    draw_box(f"/World/Trial/ReceiverSkeleton/bone_{i}", segment_box(a, b, .009), [.7, .4, .9])
+                p = np.asarray(delivery["T_world_object"])[:3, 3]
+                draw_box("/World/Trial/ReceiverSkeleton/target_direction",
+                         segment_box(p, p+.12*np.asarray(delivery["hand_direction_world"]), .004), [.95, .5, .12])
+            for i, b in enumerate(trial.get("obstacle_boxes_world", [])):
+                # The default table is already present in the shared stage.
+                if b.get("label") != "table":
+                    draw_box(f"/World/Trial/Obstacles/part_{i}", b, [.45, .4, .4], collider=True)
             for i, b in enumerate(trial["hand_boxes_world"]):
-                draw_box(f"/World/Trial/Hand/part_{i}", b, [1., .64, .31], collider=True)
+                draw_box(f"/World/Trial/Hand/part_{i}", b, [1., .64, .31], collider=hand_collision == "boxes")
                 if "hand_mesh_world" in trial:
                     UsdGeom.Imageable(stage.GetPrimAtPath(f"/World/Trial/Hand/part_{i}")).MakeInvisible()
             if "hand_mesh_world" in trial:
                 data = trial["hand_mesh_world"]
-                mesh = UsdGeom.Mesh.Define(stage, "/World/Trial/HandVisual")
+                mesh = UsdGeom.Mesh.Define(stage, "/World/Trial/Hand/mesh")
                 mesh.CreatePointsAttr([Gf.Vec3f(*p) for p in data["vertices"]])
                 mesh.CreateFaceVertexCountsAttr([3] * len(data["faces"]))
                 mesh.CreateFaceVertexIndicesAttr(np.asarray(data["faces"]).reshape(-1).tolist())
                 mesh.CreateSubdivisionSchemeAttr("none")
                 mesh.CreateDisplayColorAttr([Gf.Vec3f(1., .64, .31)])
+                if hand_collision == "mesh":
+                    UsdPhysics.CollisionAPI.Apply(mesh.GetPrim())
+                    UsdPhysics.MeshCollisionAPI.Apply(mesh.GetPrim()).CreateApproximationAttr("none")
             world.set_simulation_dt(physics_dt=trial["dt_s"], rendering_dt=trial["dt_s"])
             q0 = trial["executed_joints"][0]
             robot_ops = [draw_box(f"/World/Trial/Robot/part_{i}", b, [.35, .6, .9])
@@ -145,6 +165,8 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                                       quaternion(b["rotation"]), report_hit, False)
                 contacts.append(hit_hand[0])
             result = evaluate(trial, contacts)
+            result["safe_source"] = f"Isaac Sim PhysX robot-box overlap against static hand {hand_collision} at every frame"
+            result["hand_collision"] = hand_collision
             result["execution_wall_time_s"] = time.perf_counter() - started
             result["backend"] = "isaacsim-physx"
             result["physics_scope"] = "Static hand colliders and robot-box overlap queries; object rigidly replayed; no grasp dynamics"

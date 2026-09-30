@@ -52,3 +52,25 @@ continuous collision detection or the original paper's numeric results.
   timeline is configured at 60 frames per second.
 - Version 0.2.0 wheel installed independently; all 12 CPU evaluations ran from
   outside the source directory and wrote the standalone HTML report.
+
+## 0.3.0 paper-detail follow-up
+
+- Twenty CPU tests pass. New coverage includes full-pose IK, RRT detouring around
+  a blocking obstacle, attached-object collision, unreachable-target failure,
+  mesh-mode input requirements, and unbalanced object/split aggregation.
+- The skeletal ergonomic target produced by the companion method yielded an
+  85-frame planned trajectory. Isaac Sim replay passed all five S1 criteria and
+  exported a screenshot, report and animation. Supplied keypoint visualization
+  was visually inspected; `ergonomic_demo.png` is from this actual run.
+- The real coarse Text2HOI/MANO bottle output ran with triangle-mesh hand
+  collision enabled and passed all active S0 criteria.
+- A separate unsafe trajectory with a procedural triangulated hand generated
+  15 contact frames and a Safe failure, confirming mesh colliders participate
+  in PhysX queries rather than merely being rendered.
+- All 12 original bundled traces ran again in Isaac Sim; metrics, first-failure
+  labels and contact counts matched the recorded initial release results.
+- Version 0.3.0 standalone wheels built successfully. Independently installed
+  method delivery, benchmark IK/planning and offline evaluation ran outside
+  both source directories.
+- These checks do not validate MoveIt equivalence, mesh-accurate robot planning,
+  original 16-object splits, or the paper's quantitative performance.

@@ -55,15 +55,17 @@ random seed to replay them. The complete release set has 12 trials.
 
 Replace boxes with your own geometric approximation and provide trajectories
 from any planner. Keep the transform convention unchanged. A full MoveIt
-backend, robot CAD/articulation, MANO geometry or neural policy can be added
+backend, robot CAD/articulation or neural policy can be added
 later without changing failure-order semantics. Do not compare demo success
 rates to the paper's table: assets, splits, geometry and planner differ.
 
 ## Predicted hand and execution status (0.2.0)
 
 Optional `hand_mesh_world` contains `vertices` (N x 3 finite coordinates) and
-`faces` (M x 3 integer vertex indices). It is used for rendering only;
-`hand_boxes_world` remains the PhysX collision approximation. Conversion from
+`faces` (M x 3 integer vertex indices). By default it is used for rendering,
+with `hand_boxes_world` as the collision approximation. In 0.3.0,
+`--hand-collision mesh` uses the triangles as the static PhysX collider for Safe.
+The CPU evaluator and planner continue to use the box approximation. Conversion from
 the companion method now preserves a supplied `palm_normal` instead of always
 substituting the procedural default.
 
@@ -78,3 +80,19 @@ the default fixtures (or the rate defined by `dt_s`). These are kinematic
 transform samples, not a saved dynamic articulation simulation. `report.html`
 links only artifacts recorded as produced by the current run; stale screenshots
 from an earlier run in the same directory are not presented as current outputs.
+
+## Planned trials and table aggregation (0.3.0)
+
+Optional `delivery` contains the companion method's computed world-frame target
+and body keypoints. These keypoints are visual references, not colliders.
+Optional `obstacle_boxes_world` specifies planner obstacle geometry.
+Optional `planning` records status, algorithm, random seed, tolerances,
+collision scope, failure reason and measured time. Such trials receive the
+stronger Plan check described in [paper details](paper_details.md). The original
+12 stored traces still use their original lightweight check.
+
+Results add `execution_time_s` (simulated duration), `total_time_s` (null without
+measured planning), and a measured `planning_time_s` for new plans. Isaac Sim
+results record `hand_collision` and the actual collision source.
+`paper_table.csv/json` follows Table I object and split weights; the existing
+`summary.json` remains a pooled trial summary.

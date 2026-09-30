@@ -32,6 +32,12 @@ def validate_trial(trial):
         joints(q)
     for b in trial["object_boxes"] + trial["usage_boxes"] + trial["hand_boxes_world"]:
         box_pose(b)
+    for b in trial.get("obstacle_boxes_world", []):
+        box_pose(b)
+    if "planning" in trial:
+        planning = trial["planning"]
+        if planning["status"] not in ("succeeded", "failed") or not np.isfinite(planning["time_s"]) or planning["time_s"] < 0:
+            raise ValueError("Invalid planning status or time")
     if not trial["object_boxes"] or not trial["hand_boxes_world"]:
         raise ValueError("Object and receiving hand geometries cannot be empty")
     if trial["split"] == "S1" and not trial["usage_boxes"]:
@@ -68,6 +74,17 @@ def evaluate(trial, physics_contacts=None):
     # A sampled path check, no planner search, self-collision or obstacle checking.
     plan_contact = any(hand_contact(trial, q, width) for q in planned)
     plan = bool(endpoint_ok and limits_ok and not plan_contact)
+    plan_scope = "Provided joint path: joint limits, endpoint and sampled hand clearance only"
+    if "planning" in trial:
+        from .planning import configuration_clear, edge_samples
+        # Recheck edges too: editing or sparsifying a planned trace cannot skip an obstacle.
+        clear = trial["planning"]["status"] == "succeeded"
+        if clear:
+            clear = configuration_clear(trial, planned[0]) and all(
+                configuration_clear(trial, q) for a, b in zip(planned[:-1], planned[1:])
+                for q in edge_samples(np.asarray(a), np.asarray(b))[1:])
+        plan = bool(plan and clear)
+        plan_scope = "Numerical pose IK + RRT-Connect; robot/object/hand/obstacle box checks, sampled edges and nonadjacent arm checks"
     final_world_object = tcp(executed[-1]) @ inverse(grasp)
     delivered = [moved(b, final_world_object) for b in trial["object_boxes"]]
     sphere_center = vector(trial["palm_position_world"]) + trial["reach_offset_m"]*unit(trial["palm_normal_world"])
@@ -91,9 +108,11 @@ def evaluate(trial, physics_contacts=None):
             "variant": trial["variant"], "metrics": values, "success": failure is None,
             "first_failure": failure, "width_m": width, "contact_frames": contact_indices,
             "safe_source": safe_source, "trajectory_duration_s": (len(executed)-1)*trial["dt_s"],
-            "planning_time_s": None, "execution_wall_time_s": None,
+            "planning_time_s": trial.get("planning", {}).get("time_s"), "execution_wall_time_s": None,
+            "execution_time_s": (len(executed)-1)*trial["dt_s"],
+            "total_time_s": (trial["planning"]["time_s"]+(len(executed)-1)*trial["dt_s"]) if "planning" in trial else None,
             "scope": "Procedural geometry and UR5e joint replay; not original paper trials",
-            "plan_scope": "Provided joint path: joint limits, endpoint and sampled hand clearance only"}
+            "plan_scope": plan_scope}
 
 
 def summarize(results):
