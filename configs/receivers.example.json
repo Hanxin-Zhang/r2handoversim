@@ -71,6 +71,6 @@
         -50
       ]
     ],
-    "require_reference_ik": false
+    "require_reference_ik": true
   }
 }

@@ -228,3 +228,21 @@ its 778-vertex/1,538-face left/right rest templates matched the locally decoded
 zero-pose templates within 2e-8 m. Model files and generated meshes remain local.
 Per-trial results, frame counts and scene poses are in
 [fixed_receiver_validation.json](fixed_receiver_validation.json).
+
+The mixed-object recording stress test exposed a stale PhysX scene during
+same-path USD replacement. The backend now creates a fresh USD/PhysX world per
+trial, verifies eight small surface probes on the current hand, and checkpoints
+completed media metadata. All 33 original method inputs were then **replanned**
+in fresh scenes: geometry, joint trajectories, five metrics and first failures
+were unchanged, and all 264 hand-surface probes passed. The interrupted movie
+batch remains marked failed; it is not treated as a complete 33-trial run.
+
+The paper-aligned receiver config now defaults to reference-IK-conditioned
+sampling, before method selection. A separate can run used two accepted proposals
+(seed 27; no rejected proposals in this small draw), then four method modes on
+each fixed scene: eight trials passed export verification, with five successes
+and three Plan failures. Reference IK defines the sampling set and does not
+promise that every subsequently selected grasp has a feasible Plan. This is an
+explicit construction of a reachable set, not recovery of the unpublished
+original sampling distribution. Earlier bounded-workspace results retain their
+original labels and are not retroactively called conditioned samples.

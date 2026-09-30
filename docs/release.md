@@ -65,9 +65,11 @@ and baseline inference implementations are not included. Table I source values
 and reconstructed aggregates are distinguished from evaluated replay outcomes.
 There are no claimed replications of original experiment logs or real-hardware
 studies. The robot is driven kinematically, with a rigidly attached object;
-frictional grasp dynamics are not simulated. The optional planner uses sampled
-box proxies. Original-asset retargeting changes the receiving hand and therefore
-does not preserve fixed-world paired method comparisons.
+frictional grasp dynamics are not simulated. The procedural CPU planner uses
+sampled box proxies; fixed receiver scenes use the original-collider PhysX
+planner. The legacy asset-demo retargeting workflow changes the receiving hand
+and cannot establish paired method comparisons. Use `receiver-scenes` before
+method selection for fixed-world comparisons.
 
 The original asset adapter supports the documented `danilab_ur5e` assembly;
 arbitrary UR5e/Robotiq USDs may have different frames, joints and colliders and

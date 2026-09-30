@@ -85,9 +85,10 @@ the repository does not redistribute MANO model weights or hand templates.
 
    Fixed-world scene conversion defers planning to Isaac Sim. The command uses
    original USD colliders, the attached object convex hull and static hand
-   triangles. It never moves the receiver to accommodate a grasp. A positive
-   overlap-query control verifies the hand collider is live; its vertices are
-   checked during execution. Failure records remain at home and are retained.
+   triangles. It never moves the receiver to accommodate a grasp. Each trial
+   starts a fresh USD/PhysX world. Eight position-sensitive surface probes
+   verify the current hand collider, and its vertices are checked during
+   execution. Failure records remain at home and are retained.
    A failure clip is therefore a stationary diagnostic scene, not a successful
    delivery animation.
 
@@ -106,11 +107,14 @@ claim that method was evaluated on the new hand.
 
 Uniform XYZ and roll/pitch/yaw bounds are explicit config values. Seeds use an
 object-specific deterministic stream; the left/right templates cycle evenly.
-The default is bounded-workspace sampling, **not a recovered original reachable
-set**. The optional `require_reference_ik: true` conditions proposals on full-pose
-IK for the preselection reference grasp; it requires its calibrated
+The provided config and hand exporter enable `require_reference_ik: true`,
+which conditions proposals on full-pose IK for a preselection reference grasp,
+matching the requirement to sample from a reachable set. This is **not a recovered
+original reachable-set distribution**; it requires its calibrated
 `T_tcp_asset_tool`. Every accepted/rejected proposal is saved in the receiver
-bank. This is a separate operational reachable-set definition, not evidence of
+bank. Explicitly setting it to false gives bounded-workspace geometry demos,
+including the earlier local integration samples, without the reachability
+condition. This is a separate operational reachable-set definition, not evidence of
 the paper's unpublished sampling algorithm. Collision or method failures never
 cause receiver resampling.
 

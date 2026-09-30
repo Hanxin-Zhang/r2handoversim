@@ -12,6 +12,9 @@
   per-frame hand contact observations and receiver-pose trajectory exports.
 - Fix paired conversion and delivery inputs overwriting fixed receiver targets.
 - Add verified review-video captions and explicit paper-fidelity documentation.
+- Start a fresh PhysX scene per trial and verify receiver surface positions to
+  prevent stale collider queries in mixed-object batches.
+- Default public receiver configs to preselection reference-IK conditioning.
 
 
 ## 0.9.0

@@ -45,7 +45,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
         from isaacsim.core.api import World
         from isaacsim.core.utils.viewports import set_camera_view
         from pxr import Gf, Usd, UsdGeom, UsdLux, UsdPhysics, PhysicsSchemaTools
-        from omni.physx import get_physx_scene_query_interface
+        from omni.physx import get_physx_scene_query_interface, get_physx_interface
         import carb
         world = World(stage_units_in_meters=1., physics_dt=1/60, rendering_dt=1/60)
         stage = world.stage
@@ -104,11 +104,28 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
         draw_box("/World/Table", box([-.35, 0, .70], [.65, .55, .035]), [.24, .29, .36], collider=True)
         save_run("running")
         requested_hand_collision = hand_collision
-        for trial in trials:
+        for trial_index, trial in enumerate(trials):
             from copy import deepcopy
             trial = deepcopy(trial)
             hand_collision = trial.get('receiver_protocol',{}).get('hand_collision',requested_hand_collision)
+            if trial_index:
+                # A fresh USD stage also invalidates PhysX's cached geometry/actor handles.
+                world.stop()
+                get_physx_interface().release_physics_objects()
+                World.clear_instance()
+                from isaacsim.core.utils.stage import create_new_stage
+                create_new_stage()
+                app.update()
+                world=World(stage_units_in_meters=1.,physics_dt=1/60,rendering_dt=1/60)
+                stage=world.stage
+                world.scene.add_default_ground_plane()
+                dome=UsdLux.DomeLight.Define(stage,'/World/Light');dome.CreateIntensityAttr(1500.)
+                draw_box('/World/Table',box([-.35,0,.70],[.65,.55,.035]),[.24,.29,.36],collider=True)
+                set_camera_view(eye=np.array([1.3,-1.8,1.8]),target=np.array([-.35,-.1,1.05]))
             world.stop()
+            # PhysX actor handles can otherwise survive USD prim-path reuse across trials.
+            get_physx_interface().release_physics_objects()
+            app.update()
             if stage.GetPrimAtPath("/World/Trial"):
                 stage.RemovePrim("/World/Trial")
             UsdGeom.Xform.Define(stage, "/World/Trial")
@@ -230,6 +247,7 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 circle.CreateWidthsAttr([.002])
                 circle.SetWidthsInterpolation("constant")
                 circle.CreateDisplayColorAttr([Gf.Vec3f(.15, .8, .3)])
+            get_physx_interface().force_load_physics_from_usd()
             world.reset()
             if asset_robot: asset_robot.update(q0, opening)
             world.step(render=True)
@@ -246,9 +264,26 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                     return True
                 center=(hand_vertices.min(0)+hand_vertices.max(0))/2
                 extents=(hand_vertices.max(0)-hand_vertices.min(0))/2+.002
-                query.overlap_box(carb.Float3(*extents),carb.Float3(*center),carb.Float4(0,0,0,1),hand_probe,False)
-                if not seen: raise RuntimeError('PhysX positive control did not detect the receiver mesh')
+                # USD cooking can finish after reset, especially when switching object meshes.
+                # Advance scene synchronization until the actual receiver shape is queryable.
+                ready_started=time.monotonic()
+                for ready_step in range(120):
+                    query.overlap_box(carb.Float3(*extents),carb.Float3(*center),carb.Float4(0,0,0,1),hand_probe,False)
+                    if seen: break
+                    if time.monotonic()-ready_started>10.: break
+                    world.step(render=False)
+                    app.update()
+                if not seen: raise RuntimeError('PhysX positive control did not detect the receiver mesh after scene synchronization')
                 trial['receiver_protocol']['live_hand_collider_verified']=True
+                trial['receiver_protocol']['hand_collider_ready_steps']=ready_step
+                # Position-sensitive controls distinguish this hand from a stale nearby actor.
+                surface_indices=np.linspace(0,len(hand_vertices)-1,8,dtype=int)
+                for vertex in hand_vertices[surface_indices]:
+                    seen.clear()
+                    query.overlap_box(carb.Float3(.0015,.0015,.0015),carb.Float3(*vertex),carb.Float4(0,0,0,1),hand_probe,False)
+                    if not seen: raise RuntimeError('PhysX receiver surface probe disagrees with the current hand mesh')
+                trial['receiver_protocol']['hand_surface_probes_verified']=len(surface_indices)
+                trial['receiver_protocol']['physics_scene_lifecycle']='fresh_usd_stage_per_trial'
             if trial.get('receiver_protocol',{}).get('replan_in_isaac'):
                 if not asset_robot or hand_collision != 'mesh' or point_op is None:
                     raise ValueError('Fixed-receiver mesh planning requires original robot/object and receiving-hand mesh')
@@ -402,6 +437,8 @@ def replay(trials, output, headless=False, hold=False, render_every=1, screensho
                 from .animation import bake
                 bake(snapshot, output / f"{trial['id']}_animation.usda", trial, asset_robot=asset_robot, opening=opening if asset_robot else None)
                 result["artifacts"]["animation"] = f"{trial['id']}_animation.usda"
+            save_results(results, output)
+            save_run("running")
             print(f"{trial['id']}: {result['first_failure'] or 'success'} (Isaac Sim)", flush=True)
         save_results(results, output)
         save_run("succeeded")

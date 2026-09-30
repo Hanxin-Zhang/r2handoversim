@@ -66,7 +66,9 @@ def review_montage(directory, destination):
             receiver=trial.get('receiver',{})
             caption=f"REPLAY | {row['trial_id']}\n"
             policy=trial.get('grasp_contract',{}).get('feasibility_width_policy','opening') if 'method_selection' in trial else 'geometry demo'
-            caption+=f"Receiver: {receiver.get('side','provided')} | seed {receiver.get('seed','n/a')} | {trial['split']} | {policy} | "
+            sampling=('reference IK' if trial.get('receiver_protocol',{}).get('sampling_bounds',{}).get('require_reference_ik')
+                      else 'bounded' if receiver else 'provided hand')
+            caption+=f"Receiver: {receiver.get('side','provided')} | seed {receiver.get('seed','n/a')} ({sampling}) | {trial['split']} | {policy} | "
             caption+=f"{row['first_failure']+' failure' if row['first_failure'] else 'success'}\n"
             caption+='  '.join(f'{key}: {"n/a" if value is None else "pass" if value else "fail"}' for key,value in row['metrics'].items())
             textfile=tmp/f'{i}.txt';textfile.write_text(caption)
