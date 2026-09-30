@@ -14,6 +14,8 @@ replay supplied joint trajectories; an optional planner can generate new paths
 for independently supplied handover targets. They do not reproduce the paper's complete
 UR5e/Robotiq/MANO/MoveIt experiments or the four published baselines.
 
+Companion method: [Intent-Handover](https://github.com/Hanxin-Zhang/intent-handover).
+
 ## Run in Isaac Sim
 
 Tested with Isaac Sim **5.0.0**, Python **3.11**, Linux, RTX 4070. Isaac Sim must
@@ -21,6 +23,8 @@ already be installed and its license accepted by the user. In its Python
 environment:
 
 ```bash
+git clone https://github.com/Hanxin-Zhang/r2handoversim.git
+cd r2handoversim
 python -m pip install --upgrade pip setuptools wheel
 python -m pip install -e .
 r2handoversim demo --object hammer --hold
