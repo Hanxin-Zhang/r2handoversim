@@ -113,7 +113,13 @@ release's nominal UR5e base. Object names must match the OBJ filenames;
 same object frame as the configured point cloud. Source paths and hashes are
 recorded in results. Assets remain local and are not redistributed.
 
-The original gripper tool frame is calibrated from its finger pads. Local-asset
+The commands above run **legacy adapted geometry demos**. For unchanged method
+selections and paired fixed-hand comparisons, follow the
+[fixed receiver workflow](docs/fixed_receivers.md): calibrate all candidates,
+sample receiver scenes, select a method grasp, then convert and replay. That
+workflow uses original-collider planning and mesh-based Reach/Affordance checks.
+
+The original gripper tool frame is calibrated from its finger pads. Legacy demo
 replay refits the supplied approach to opposing object-mesh surfaces inside the
 flat pads, and inverts the actual Robotiq linkage to set the local contact gap.
 The original grasp is retained in `grasp_contact`; each side must be within
